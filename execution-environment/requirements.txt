@@ -1,0 +1,47 @@
+# Python dependencies for AAP Workshop Execution Environment
+# These packages support the Ansible collections and workshop functionality
+
+# Core Kubernetes/OpenShift Python client
+kubernetes>=28.1.0
+openshift>=0.13.0
+
+# HTTP client libraries
+requests>=2.31.0
+urllib3>=1.26.0
+
+# YAML processing
+PyYAML>=6.0.0
+ruamel.yaml>=0.17.0
+
+# JSON processing and data manipulation
+jinja2>=3.1.0
+jsonpatch>=1.32
+jsonpointer>=2.3
+
+# Cryptography and security
+cryptography>=41.0.0
+pycparser>=2.21
+
+# Network utilities
+netaddr>=0.8.0
+ipaddress>=1.0.23
+
+# Date/time handling
+python-dateutil>=2.8.0
+
+# HTTP parsing
+httplib2>=0.22.0
+
+# Additional useful libraries for workshop scenarios
+tabulate>=0.9.0
+rich>=13.0.0
+
+# Testing utilities (useful for workshop validation)
+pytest>=7.0.0
+pytest-ansible>=4.0.0
+
+# Docker client (for container operations)
+docker>=6.0.0
+
+# Additional OpenShift utilities
+python-string-utils>=1.0.0

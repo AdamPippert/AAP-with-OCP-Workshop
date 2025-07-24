@@ -1,0 +1,55 @@
+---
+# Execution Environment Definition for AAP Workshop
+# This file defines the container image build configuration for ansible-builder
+
+version: "3"
+
+images:
+  base_image:
+    name: 'registry.redhat.io/ubi8/ubi:latest'
+
+dependencies:
+  # System packages
+  system: bindep.txt
+  
+  # Python packages  
+  python: requirements.txt
+  
+  # Ansible collections
+  galaxy: requirements.yml
+
+additional_build_steps:
+  prepend_base:
+    # Install OpenShift CLI during build
+    - RUN dnf install -y wget tar gzip && \
+        wget -O /tmp/openshift-client-linux.tar.gz https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz && \
+        tar -xzf /tmp/openshift-client-linux.tar.gz -C /usr/local/bin/ oc kubectl && \
+        chmod +x /usr/local/bin/oc /usr/local/bin/kubectl && \
+        rm -f /tmp/openshift-client-linux.tar.gz
+    
+    # Create workshop user
+    - RUN useradd -m -s /bin/bash workshop && \
+        echo 'workshop:workshop' | chpasswd
+  
+  append_final:
+    # Set workshop-specific environment variables
+    - ENV WORKSHOP_TYPE="AAP-OpenShift-Integration"
+    - ENV WORKSHOP_VERSION="2.5"
+    - ENV PATH="/usr/local/bin:$PATH"
+    
+    # Create workshop directories
+    - RUN mkdir -p /opt/workshop/playbooks /opt/workshop/inventory /opt/workshop/logs && \
+        chown -R workshop:workshop /opt/workshop
+    
+    # Set default working directory
+    - WORKDIR /opt/workshop
+    
+    # Set labels for image identification
+    - LABEL maintainer="AAP Workshop Team"
+    - LABEL version="1.0"
+    - LABEL description="Execution Environment for Advanced AAP 2.5 with OpenShift Workshop"
+    - LABEL workshop.type="aap-openshift-integration"
+    - LABEL workshop.collections="kubernetes.core,redhat.openshift"
+
+build_arg_defaults:
+  ANSIBLE_GALAXY_CLI_COLLECTION_OPTS: "--pre"

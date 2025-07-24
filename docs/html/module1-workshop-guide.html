@@ -195,16 +195,16 @@
 
         <h3>Quick Environment Check</h3>
         <pre><code class="language-bash"># Verify cluster connectivity
-kubectl get nodes
+oc get nodes
 
 # Check your current context
-kubectl config current-context
+oc config current-context
 
 # Verify Ansible collections
 ansible-galaxy collection list | grep kubernetes.core
 
 # Test basic OpenShift API access
-kubectl get pods --all-namespaces | head -5</code></pre>
+oc get pods --all-namespaces | head -5</code></pre>
 
         <h2>Module Structure</h2>
         <table>
@@ -306,17 +306,17 @@ ansible-inventory -i inventory/exercise1-1-single-cluster.yml --graph</code></pr
                     <tr>
                         <td>No pods discovered</td>
                         <td>Empty inventory output</td>
-                        <td>Check cluster connectivity: <code>kubectl get pods</code></td>
+                        <td>Check cluster connectivity: <code>oc get pods</code></td>
                     </tr>
                     <tr>
                         <td>Permission denied</td>
                         <td>403 Forbidden errors</td>
-                        <td>Verify RBAC: <code>kubectl auth can-i get pods</code></td>
+                        <td>Verify RBAC: <code>oc auth can-i get pods</code></td>
                     </tr>
                     <tr>
                         <td>Wrong context</td>
                         <td>Connection refused</td>
-                        <td>Check context: <code>kubectl config current-context</code></td>
+                        <td>Check context: <code>oc config current-context</code></td>
                     </tr>
                 </tbody>
             </table>
@@ -343,7 +343,7 @@ ansible-inventory -i inventory/exercise1-1-single-cluster.yml --graph</code></pr
 
         <h4>Step 1: Update Cluster Contexts (3 minutes)</h4>
         <pre><code class="language-bash"># Check available contexts
-kubectl config get-contexts
+oc config get-contexts
 
 # Update inventory file with your actual context names
 # Edit inventory/exercise1-2-multi-cluster.yml
@@ -499,8 +499,8 @@ ls -la /tmp/inventory-diagnostic-*.txt</code></pre>
             <h3>Issue 1: "Failed to connect to cluster"</h3>
             <p><strong>Symptoms:</strong> Connection refused or timeout errors</p>
             <p><strong>Diagnosis:</strong></p>
-            <pre><code class="language-bash">kubectl cluster-info
-kubectl config current-context</code></pre>
+            <pre><code class="language-bash">oc cluster-info
+oc config current-context</code></pre>
             <p><strong>Solution:</strong> Verify kubeconfig and network connectivity</p>
         </div>
 
@@ -508,8 +508,8 @@ kubectl config current-context</code></pre>
             <h3>Issue 2: "Permission denied for resource discovery"</h3>
             <p><strong>Symptoms:</strong> 403 Forbidden errors</p>
             <p><strong>Diagnosis:</strong></p>
-            <pre><code class="language-bash">kubectl auth can-i get pods
-kubectl auth can-i list pods --all-namespaces</code></pre>
+            <pre><code class="language-bash">oc auth can-i get pods
+oc auth can-i list pods --all-namespaces</code></pre>
             <p><strong>Solution:</strong> Check RBAC permissions for your service account</p>
         </div>
 
@@ -517,7 +517,7 @@ kubectl auth can-i list pods --all-namespaces</code></pre>
             <h3>Issue 3: "No pods in inventory"</h3>
             <p><strong>Symptoms:</strong> Empty inventory results</p>
             <p><strong>Diagnosis:</strong></p>
-            <pre><code class="language-bash">kubectl get pods --all-namespaces | grep -v kube-system</code></pre>
+            <pre><code class="language-bash">oc get pods --all-namespaces | grep -v kube-system</code></pre>
             <p><strong>Solution:</strong> Check filters in inventory configuration, ensure pods exist</p>
         </div>
 

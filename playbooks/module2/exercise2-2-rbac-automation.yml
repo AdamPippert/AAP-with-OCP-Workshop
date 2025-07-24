@@ -297,7 +297,7 @@
         namespace: "{{ module2_namespace }}"
         pod: "{{ ansible_hostname | default('test-pod') }}"
         command: |
-          kubectl auth can-i get pods --as=system:serviceaccount:{{ module2_namespace }}:{{ item.name }}
+          oc auth can-i get pods --as=system:serviceaccount:{{ module2_namespace }}:{{ item.name }}
       loop: "{{ service_accounts }}"
       when: 
         - item.environments is not defined or workshop_environment in item.environments

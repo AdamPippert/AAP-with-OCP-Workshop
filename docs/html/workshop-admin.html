@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AAP Workshop - Lab Environment Access</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .security-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-left: 4px solid #f39c12;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 4px;
+        }
+        
+        .security-warning h3 {
+            color: #d68910;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .security-warning h3::before {
+            content: "⚠️";
+            margin-right: 10px;
+            font-size: 1.2em;
+        }
+        
+        .info-section {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+        
+        .info-section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+        }
+        
+        .credential-group {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .credential-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f1f3f4;
+        }
+        
+        .credential-item:last-child {
+            border-bottom: none;
+        }
+        
+        .credential-label {
+            font-weight: 600;
+            color: #495057;
+            min-width: 150px;
+        }
+        
+        .credential-value {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            background: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            word-break: break-all;
+            flex: 1;
+            margin-left: 15px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .url-link {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .url-link:hover {
+            text-decoration: underline;
+            color: #2980b9;
+        }
+        
+        .copy-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+            margin-left: 8px;
+            transition: background 0.2s;
+        }
+        
+        .copy-btn:hover {
+            background: #2980b9;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+        }
+        
+        .footer {
+            background: #2c3e50;
+            color: white;
+            padding: 20px 40px;
+            text-align: center;
+            font-size: 0.9em;
+        }
+        
+        .timestamp {
+            opacity: 0.7;
+            font-style: italic;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 8px;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .credential-item {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .credential-value {
+                margin-left: 0;
+                margin-top: 5px;
+            }
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #27ae60;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Advanced Ansible Automation Platform Workshop</h1>
+            <p>Lab Environment Access Information</p>
+        </div>
+        
+        <div class="content">
+            <div class="security-warning">
+                <h3>Security Notice</h3>
+                <ul>
+                    <li><strong>Keep credentials secure:</strong> Do not share these credentials outside of the workshop</li>
+                    <li><strong>Workshop use only:</strong> These credentials are valid only during the workshop period</li>
+                    <li><strong>No screenshots:</strong> Avoid taking screenshots that include sensitive information</li>
+                    <li><strong>Report issues:</strong> Contact workshop facilitators immediately if you suspect credential compromise</li>
+                </ul>
+            </div>
+            
+            <div class="grid">
+                <div class="info-section">
+                    <h2><span class="status-indicator"></span>OpenShift Cluster Access</h2>
+                    <div class="credential-group">
+                        <div class="credential-item">
+                            <span class="credential-label">Console URL:</span>
+                            <span class="credential-value">
+                                <a href="https://console-openshift-console.apps.cluster-wld5k-1.dynamic.redhatworkshops.io" target="_blank" class="url-link">https://console-openshift-console.apps.cluster-wld5k-1.dynamic.redhatworkshops.io</a>
+                            </span>
+                        </div>
+                        <div class="credential-item">
+                            <span class="credential-label">API Endpoint:</span>
+                            <span class="credential-value">https://api.cluster-wld5k-1.dynamic.redhatworkshops.io:6443</span>
+                        </div>
+                        <div class="credential-item">
+                            <span class="credential-label">Bearer Token:</span>
+                            <span class="credential-value">sha256~K4kqKIpPviLzzdt1rZJuuRiqu4Sxag6sXqNW7gbvDgU</span>
+                        </div>
+                        <div class="credential-item">
+                            <span class="credential-label">oc Client:</span>
+                            <span class="credential-value">
+                                <a href="http://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-4.16/openshift-client-linux.tar.gz" target="_blank" class="url-link">Download oc client</a>
+                            </span>
+                        </div>
+                    </div>
+                    <p><strong>Login Instructions:</strong></p>
+                    <p><strong>Option 1: Command Line (oc CLI):</strong></p>
+                    <ol>
+                        <li>Download and install the oc client</li>
+                        <li>Run: <code>oc login [API-Endpoint] --token=[Bearer-Token]</code></li>
+                        <li>Verify login: <code>oc whoami</code></li>
+                    </ol>
+                    <p><strong>Option 2: Web Console:</strong></p>
+                    <ol>
+                        <li>Click the Console URL above</li>
+                        <li>Select your authentication method</li>
+                        <li>Use your provided workshop credentials or bearer token</li>
+                    </ol>
+                </div>
+                <div class="info-section">
+                    <h2><span class="status-indicator"></span>Ansible Automation Platform</h2>
+                    <div class="credential-group">
+                        <div class="credential-item">
+                            <span class="credential-label">Controller URL:</span>
+                            <span class="credential-value">
+                                <a href="https://aap-aap.apps.cluster-wld5k-1.dynamic.redhatworkshops.io" target="_blank" class="url-link">https://aap-aap.apps.cluster-wld5k-1.dynamic.redhatworkshops.io</a>
+                            </span>
+                        </div>
+                        <div class="credential-item">
+                            <span class="credential-label">Username:</span>
+                            <span class="credential-value">admin</span>
+                        </div>
+                        <div class="credential-item">
+                            <span class="credential-label">Password:</span>
+                            <span class="credential-value">MjMwMDYy</span>
+                        </div>
+                        <div class="credential-item">
+                            <span class="credential-label">API Token:</span>
+                            <span class="credential-value">OR6Ly2oxW6vdSrF97nTfaSx1N4xlfa</span>
+                        </div>
+                    </div>
+                    <p><strong>Access Instructions:</strong></p>
+                    <ol>
+                        <li>Navigate to the Controller URL</li>
+                        <li>Log in with the provided credentials</li>
+                        <li>Explore the AAP interface and configured resources</li>
+                    </ol>
+                </div>
+                <div class="info-section">
+                    <h2><span class="status-indicator"></span>SSH Bastion Access</h2>
+                    <div class="credential-group">
+                        <div class="credential-item">
+                            <span class="credential-label">SSH Command:</span>
+                            <span class="credential-value">ssh lab-user@ssh.ocpv07.rhdp.net -p 31391</span>
+                        </div>
+                        <div class="credential-item">
+                            <span class="credential-label">Password:</span>
+                            <span class="credential-value">ieg7qQnbvQo5</span>
+                        </div>
+                    </div>
+                    <p><strong>Connection Instructions:</strong></p>
+                    <ol>
+                        <li>Open a terminal or SSH client</li>
+                        <li>Copy and paste the SSH command above</li>
+                        <li>Enter the password when prompted</li>
+                        <li>You'll have access to the lab environment CLI tools</li>
+                    </ol>
+                </div>
+            </div>
+            
+            <div class="info-section">
+                <h2>Workshop Resources</h2>
+                <div class="credential-group">
+                    <div class="credential-item">
+                        <span class="credential-label">Module Guides:</span>
+                        <span class="credential-value">
+                            <a href="module1-workshop-guide.html" class="url-link">Module 1: Dynamic Inventory</a> |
+                            <a href="module2-workshop-guide.html" class="url-link">Module 2: RBAC & Deployment</a> |
+                            <a href="module3-workshop-guide.html" class="url-link">Module 3: Advanced Automation</a>
+                        </span>
+                    </div>
+                    <div class="credential-item">
+                        <span class="credential-label">Support:</span>
+                        <span class="credential-value">Contact workshop facilitators for technical assistance</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Generated on: <span class="timestamp">2025-07-24 09:15:38 UTC</span></p>
+            <p>AAP Workshop Lab Environment - For Workshop Use Only</p>
+        </div>
+    </div>
+    
+    <script>
+        // Add copy functionality
+        document.querySelectorAll('.credential-value').forEach(function(element) {
+            if (element.textContent.trim() && !element.querySelector('a')) {
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-btn';
+                copyBtn.textContent = 'Copy';
+                copyBtn.onclick = function() {
+                    navigator.clipboard.writeText(element.textContent.trim()).then(function() {
+                        copyBtn.textContent = 'Copied!';
+                        setTimeout(function() {
+                            copyBtn.textContent = 'Copy';
+                        }, 2000);
+                    });
+                };
+                element.appendChild(copyBtn);
+            }
+        });
+        
+        // Add warning before external links
+        document.querySelectorAll('a[target="_blank"]').forEach(function(link) {
+            link.onclick = function(e) {
+                if (!confirm('You are about to open an external link. Ensure you are in a secure environment. Continue?')) {
+                    e.preventDefault();
+                }
+            };
+        });
+    </script>
+</body>
+</html>

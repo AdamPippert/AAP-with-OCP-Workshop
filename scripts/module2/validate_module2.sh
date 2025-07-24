@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSHOP_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-NAMESPACE="${1:-$(kubectl config view --minify -o jsonpath='{..namespace}' 2>/dev/null || echo 'ims-workshop')}"
+NAMESPACE="${1:-$(oc config view --minify -o jsonpath='{..namespace}' 2>/dev/null || echo 'ims-workshop')}"
 ENVIRONMENT="${2:-dev}"
 
 # Logging functions
@@ -45,9 +45,9 @@ print_header() {
 check_namespace() {
     log_info "Checking namespace: $NAMESPACE"
     
-    if kubectl get namespace "$NAMESPACE" &>/dev/null; then
+    if oc get namespace "$NAMESPACE" &>/dev/null; then
         local labels
-        labels=$(kubectl get namespace "$NAMESPACE" -o jsonpath='{.metadata.labels}' 2>/dev/null || echo '{}')
+        labels=$(oc get namespace "$NAMESPACE" -o jsonpath='{.metadata.labels}' 2>/dev/null || echo '{}')
         
         if echo "$labels" | grep -q "workshop.redhat.com/module.*module2"; then
             log_success "Namespace $NAMESPACE exists with proper labels"
@@ -69,7 +69,7 @@ check_service_accounts() {
     local found=0
     
     for account in "${expected_accounts[@]}"; do
-        if kubectl get serviceaccount "$account" -n "$NAMESPACE" &>/dev/null; then
+        if oc get serviceaccount "$account" -n "$NAMESPACE" &>/dev/null; then
             log_success "Service account $account found"
             ((found++))
         else
@@ -93,7 +93,7 @@ check_rbac_configuration() {
     local total_checks=3
     
     # Check custom role
-    if kubectl get role "ims-namespace-operations" -n "$NAMESPACE" &>/dev/null; then
+    if oc get role "ims-namespace-operations" -n "$NAMESPACE" &>/dev/null; then
         log_success "Custom role 'ims-namespace-operations' found"
         ((checks_passed++))
     else
@@ -102,7 +102,7 @@ check_rbac_configuration() {
     
     # Check role bindings
     local role_bindings
-    role_bindings=$(kubectl get rolebindings -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l)
+    role_bindings=$(oc get rolebindings -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l)
     if [ "$role_bindings" -gt 0 ]; then
         log_success "$role_bindings role bindings found"
         ((checks_passed++))
@@ -112,7 +112,7 @@ check_rbac_configuration() {
     
     # Check cluster role (dev/test environments)
     if [ "$ENVIRONMENT" != "prod" ]; then
-        if kubectl get clusterrole "ims-cluster-operations" &>/dev/null; then
+        if oc get clusterrole "ims-cluster-operations" &>/dev/null; then
             log_success "Custom cluster role 'ims-cluster-operations' found"
             ((checks_passed++))
         else
@@ -137,12 +137,12 @@ check_deployment() {
     
     local app_name="ims-connector"
     
-    if kubectl get deployment "$app_name" -n "$NAMESPACE" &>/dev/null; then
+    if oc get deployment "$app_name" -n "$NAMESPACE" &>/dev/null; then
         local ready_replicas
         local desired_replicas
         
-        ready_replicas=$(kubectl get deployment "$app_name" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
-        desired_replicas=$(kubectl get deployment "$app_name" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
+        ready_replicas=$(oc get deployment "$app_name" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+        desired_replicas=$(oc get deployment "$app_name" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
         
         if [ "$ready_replicas" = "$desired_replicas" ] && [ "$ready_replicas" != "0" ]; then
             log_success "Deployment $app_name is ready ($ready_replicas/$desired_replicas replicas)"
@@ -165,7 +165,7 @@ check_supporting_resources() {
     local app_name="ims-connector"
     
     # Check ConfigMap
-    if kubectl get configmap "${app_name}-config" -n "$NAMESPACE" &>/dev/null; then
+    if oc get configmap "${app_name}-config" -n "$NAMESPACE" &>/dev/null; then
         log_success "ConfigMap ${app_name}-config found"
         ((checks_passed++))
     else
@@ -173,7 +173,7 @@ check_supporting_resources() {
     fi
     
     # Check Secret
-    if kubectl get secret "${app_name}-secret" -n "$NAMESPACE" &>/dev/null; then
+    if oc get secret "${app_name}-secret" -n "$NAMESPACE" &>/dev/null; then
         log_success "Secret ${app_name}-secret found"
         ((checks_passed++))
     else
@@ -181,7 +181,7 @@ check_supporting_resources() {
     fi
     
     # Check Service
-    if kubectl get service "${app_name}-service" -n "$NAMESPACE" &>/dev/null; then
+    if oc get service "${app_name}-service" -n "$NAMESPACE" &>/dev/null; then
         log_success "Service ${app_name}-service found"
         ((checks_passed++))
     else
@@ -202,7 +202,7 @@ test_idempotency() {
     
     # Get current deployment resource version
     local current_version
-    current_version=$(kubectl get deployment "ims-connector" -n "$NAMESPACE" -o jsonpath='{.metadata.resourceVersion}' 2>/dev/null || echo "")
+    current_version=$(oc get deployment "ims-connector" -n "$NAMESPACE" -o jsonpath='{.metadata.resourceVersion}' 2>/dev/null || echo "")
     
     if [ -z "$current_version" ]; then
         log_error "Cannot test idempotency - deployment not found"
@@ -216,7 +216,7 @@ test_idempotency() {
     sleep 2
     
     local new_version
-    new_version=$(kubectl get deployment "ims-connector" -n "$NAMESPACE" -o jsonpath='{.metadata.resourceVersion}' 2>/dev/null || echo "")
+    new_version=$(oc get deployment "ims-connector" -n "$NAMESPACE" -o jsonpath='{.metadata.resourceVersion}' 2>/dev/null || echo "")
     
     if [ "$current_version" = "$new_version" ]; then
         log_success "Deployment is stable - idempotency verified"
@@ -231,7 +231,7 @@ check_rollback_capability() {
     log_info "Checking rollback capability annotations"
     
     local deployment_annotations
-    deployment_annotations=$(kubectl get deployment "ims-connector" -n "$NAMESPACE" -o jsonpath='{.metadata.annotations}' 2>/dev/null || echo '{}')
+    deployment_annotations=$(oc get deployment "ims-connector" -n "$NAMESPACE" -o jsonpath='{.metadata.annotations}' 2>/dev/null || echo '{}')
     
     if echo "$deployment_annotations" | grep -q "deployment.workshop.redhat.com/last-operation"; then
         log_success "Rollback capability has been demonstrated (annotations found)"

@@ -1,0 +1,33 @@
+# System dependencies for AAP Workshop Execution Environment
+# This file specifies system packages needed for the workshop exercises
+
+# Essential system packages
+python3-dev [platform:dpkg]
+python3-devel [platform:rpm]
+gcc [compile]
+git [platform:rpm platform:dpkg]
+curl [platform:rpm platform:dpkg]
+
+# OpenShift client tools
+openshift-clients [platform:rpm]
+
+# Networking and SSL tools
+ca-certificates [platform:dpkg]
+ca-certificates [platform:rpm]
+openssl [platform:rpm platform:dpkg]
+libssl-dev [platform:dpkg]
+openssl-devel [platform:rpm]
+
+# Required for kubernetes.core collection
+libffi-dev [platform:dpkg]
+libffi-devel [platform:rpm]
+libyaml-dev [platform:dpkg]
+libyaml-devel [platform:rpm]
+
+# JSON processing (useful for workshop exercises)
+jq [platform:rpm platform:dpkg]
+
+# Additional tools for troubleshooting
+wget [platform:rpm platform:dpkg]
+unzip [platform:rpm platform:dpkg]
+tar [platform:rpm platform:dpkg]

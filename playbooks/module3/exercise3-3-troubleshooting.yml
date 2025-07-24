@@ -313,9 +313,9 @@
               {% if deploy.status.readyReplicas | default(0) != deploy.spec.replicas %}
               ⚠️  ISSUE DETECTED: Not all replicas are ready
               Troubleshooting Steps:
-              1. Check pod logs: kubectl logs -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }}
-              2. Describe pods: kubectl describe pods -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }}
-              3. Check events: kubectl get events --sort-by=.metadata.creationTimestamp -n {{ target_namespace }}
+              1. Check pod logs: oc logs -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }}
+              2. Describe pods: oc describe pods -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }}
+              3. Check events: oc get events --sort-by=.metadata.creationTimestamp -n {{ target_namespace }}
               4. Verify resource quotas and limits
               {% endif %}
 
@@ -327,9 +327,9 @@
               This indicates a severe deployment issue.
               
               Basic Troubleshooting:
-              1. Verify namespace exists: kubectl get namespace {{ target_namespace }}
-              2. Check deployment exists: kubectl get deployment {{ app_name }} -n {{ target_namespace }}
-              3. Review recent events: kubectl get events -n {{ target_namespace }}
+              1. Verify namespace exists: oc get namespace {{ target_namespace }}
+              2. Check deployment exists: oc get deployment {{ app_name }} -n {{ target_namespace }}
+              3. Review recent events: oc get events -n {{ target_namespace }}
 
     - name: "Create comprehensive diagnostic report"
       kubernetes.core.k8s:
@@ -402,9 +402,9 @@
                     "issue": "No running pods found",
                     "recommendation": "Check deployment configuration, resource limits, and pod logs",
                     "commands": [
-                      "kubectl describe deployment {{ app_name }} -n {{ target_namespace }}",
-                      "kubectl get events --sort-by=.metadata.creationTimestamp -n {{ target_namespace }}",
-                      "kubectl logs -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }}"
+                      "oc describe deployment {{ app_name }} -n {{ target_namespace }}",
+                      "oc get events --sort-by=.metadata.creationTimestamp -n {{ target_namespace }}",
+                      "oc logs -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }}"
                     ]
                   },
                   {% endif %}
@@ -415,8 +415,8 @@
                     "issue": "Replica count mismatch",
                     "recommendation": "Investigate why pods are not reaching ready state",
                     "commands": [
-                      "kubectl describe pods -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }}",
-                      "kubectl get pods -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }} -o wide"
+                      "oc describe pods -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }}",
+                      "oc get pods -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }} -o wide"
                     ]
                   },
                   {% endif %}
@@ -427,7 +427,7 @@
                     "issue": "No services found for application",
                     "recommendation": "Create service to expose application",
                     "commands": [
-                      "kubectl expose deployment {{ app_name }} --port=8080 --target-port=8080 -n {{ target_namespace }}"
+                      "oc expose deployment {{ app_name }} --port=8080 --target-port=8080 -n {{ target_namespace }}"
                     ]
                   },
                   {% endif %}
@@ -437,8 +437,8 @@
                     "issue": "Continuous monitoring recommended",
                     "recommendation": "Set up regular health checks and monitoring",
                     "commands": [
-                      "kubectl top pods -n {{ target_namespace }}",
-                      "kubectl get events -w -n {{ target_namespace }}"
+                      "oc top pods -n {{ target_namespace }}",
+                      "oc get events -w -n {{ target_namespace }}"
                     ]
                   }
                 ]
@@ -456,27 +456,27 @@
               
               ### Check Application Status
               ```bash
-              kubectl get all -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }}
-              kubectl describe deployment {{ app_name }} -n {{ target_namespace }}
-              kubectl get pods -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }} -o wide
+              oc get all -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }}
+              oc describe deployment {{ app_name }} -n {{ target_namespace }}
+              oc get pods -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }} -o wide
               ```
               
               ### Check Recent Events
               ```bash
-              kubectl get events --sort-by=.metadata.creationTimestamp -n {{ target_namespace }}
-              kubectl get events --field-selector type=Warning -n {{ target_namespace }}
+              oc get events --sort-by=.metadata.creationTimestamp -n {{ target_namespace }}
+              oc get events --field-selector type=Warning -n {{ target_namespace }}
               ```
               
               ### Application Logs
               ```bash
-              kubectl logs -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }} --tail=100
-              kubectl logs -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }} -f
+              oc logs -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }} --tail=100
+              oc logs -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }} -f
               ```
               
               ### Resource Usage
               ```bash
-              kubectl top pods -n {{ target_namespace }}
-              kubectl describe resourcequota -n {{ target_namespace }}
+              oc top pods -n {{ target_namespace }}
+              oc describe resourcequota -n {{ target_namespace }}
               ```
               
               ## Common Issues and Solutions
@@ -544,7 +544,7 @@
           - Performance Monitoring: Metrics and thresholds
           
           📋 NEXT STEPS:
-          1. Review diagnostic report: kubectl get configmap {{ app_name }}-diagnostic-report -n {{ target_namespace }} -o yaml
+          1. Review diagnostic report: oc get configmap {{ app_name }}-diagnostic-report -n {{ target_namespace }} -o yaml
           2. Execute recommended commands from troubleshooting playbook
           3. Monitor application performance using generated thresholds
           4. Set up automated monitoring based on workshop patterns
