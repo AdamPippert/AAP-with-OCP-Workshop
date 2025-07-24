@@ -3,6 +3,8 @@ details.txt
 workshop_details*.txt
 user_environments/
 workshop_emails/
+consolidated_workshop_email.html
+consolidated_workshop_email.txt
 *.env
 .env*
 
