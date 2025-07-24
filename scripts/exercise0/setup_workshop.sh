@@ -333,6 +333,7 @@ setup_aap_job_templates() {
     "project": ${AAP_PROJECT_ID},
     "playbook": "${playbook_path}",
     "credentials": [${AAP_CREDENTIAL_ID}],
+    "execution_environment": ${AAP_EE_ID:-null},
     "verbosity": 1,
     "ask_variables_on_launch": true,
     "ask_limit_on_launch": false,
@@ -396,6 +397,128 @@ setup_aap_resources() {
     log "AAP resources setup completed"
 }
 
+# Execution Environment Functions
+check_ee_prerequisites() {
+    log "Checking execution environment prerequisites..."
+    
+    # Check for ansible-builder
+    if ! command -v ansible-builder &> /dev/null; then
+        log "WARNING: ansible-builder not found. Installing via pip..."
+        pip install ansible-builder || {
+            log "ERROR: Failed to install ansible-builder"
+            return 1
+        }
+    fi
+    
+    # Check for container runtime (podman or docker)
+    if command -v podman &> /dev/null; then
+        export CONTAINER_RUNTIME="podman"
+    elif command -v docker &> /dev/null; then
+        export CONTAINER_RUNTIME="docker"
+    else
+        log "ERROR: Neither podman nor docker found. Please install a container runtime."
+        return 1
+    fi
+    
+    log "Using container runtime: ${CONTAINER_RUNTIME}"
+    return 0
+}
+
+build_execution_environment() {
+    log "Building custom execution environment..."
+    
+    source "${ENV_FILE}"
+    local ee_dir="${REPO_ROOT}/execution-environment"
+    local ee_name="aap-workshop-ee"
+    local ee_tag="${WORKSHOP_GUID:-latest}"
+    local ee_full_name="${ee_name}:${ee_tag}"
+    
+    if [[ ! -d "${ee_dir}" ]]; then
+        log "ERROR: Execution environment directory not found: ${ee_dir}"
+        return 1
+    fi
+    
+    # Change to EE directory
+    cd "${ee_dir}"
+    
+    # Build the execution environment
+    log "Building execution environment: ${ee_full_name}"
+    if ansible-builder build -t "${ee_full_name}" .; then
+        log "Successfully built execution environment: ${ee_full_name}"
+        echo "EE_IMAGE_NAME=${ee_full_name}" >> "${ENV_FILE}"
+        return 0
+    else
+        log "ERROR: Failed to build execution environment"
+        return 1
+    fi
+}
+
+setup_aap_execution_environment() {
+    log "Setting up execution environment in AAP Controller..."
+    
+    source "${ENV_FILE}"
+    
+    local ee_name="Workshop-EE-${WORKSHOP_GUID}"
+    local ee_image="${EE_IMAGE_NAME:-aap-workshop-ee:${WORKSHOP_GUID}}"
+    
+    # For now, we'll assume the image is available locally or in a registry
+    # In a real deployment, you'd push to a registry accessible by AAP
+    local ee_data=$(cat << EOF
+{
+    "name": "${ee_name}",
+    "description": "Custom execution environment for AAP Workshop with kubernetes.core collection",
+    "organization": 1,
+    "image": "${ee_image}",
+    "pull": "missing",
+    "credential": null
+}
+EOF
+    )
+    
+    # Check if execution environment already exists
+    local existing_ee=$(aap_api_call "GET" "/execution_environments/?name=${ee_name}" "")
+    if echo "${existing_ee}" | grep -q "\"count\":0"; then
+        log "Creating new AAP execution environment: ${ee_name}"
+        local create_result=$(aap_api_call "POST" "/execution_environments/" "${ee_data}")
+        if echo "${create_result}" | grep -q "\"id\""; then
+            log "Successfully created AAP execution environment"
+            local ee_id=$(echo "${create_result}" | grep -o '"id":[0-9]*' | cut -d':' -f2)
+            echo "AAP_EE_ID=${ee_id}" >> "${ENV_FILE}"
+        else
+            log "WARNING: Failed to create AAP execution environment: ${create_result}"
+            return 1
+        fi
+    else
+        log "AAP execution environment already exists: ${ee_name}"
+        local ee_id=$(echo "${existing_ee}" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
+        echo "AAP_EE_ID=${ee_id}" >> "${ENV_FILE}"
+    fi
+}
+
+setup_execution_environment() {
+    log "Setting up execution environment for workshop..."
+    
+    # Check prerequisites
+    if ! check_ee_prerequisites; then
+        log "WARNING: Execution environment prerequisites not met, skipping EE setup"
+        return 1
+    fi
+    
+    # Build the execution environment
+    if ! build_execution_environment; then
+        log "WARNING: Failed to build execution environment, skipping AAP EE setup"
+        return 1
+    fi
+    
+    # Set up in AAP Controller
+    if ! setup_aap_execution_environment; then
+        log "WARNING: Failed to set up execution environment in AAP"
+        return 1
+    fi
+    
+    log "Execution environment setup completed"
+}
+
 main() {
     log "Starting Exercise 0: Workshop Environment Setup"
     
@@ -408,6 +531,10 @@ main() {
     # Set up AAP resources if AAP is accessible
     source "${ENV_FILE}"
     if curl -k -s --connect-timeout 10 "${AAP_URL}/api/v2/ping/" >/dev/null; then
+        # Set up execution environment first
+        setup_execution_environment
+        
+        # Set up AAP resources (will use the execution environment if available)
         setup_aap_resources
     else
         log "WARNING: AAP not accessible, skipping AAP resource setup"

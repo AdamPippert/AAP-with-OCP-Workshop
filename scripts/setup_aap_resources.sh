@@ -77,6 +77,11 @@ show_aap_resources() {
         echo "Credential: OpenShift-${WORKSHOP_GUID} (ID: ${AAP_CREDENTIAL_ID})"
     fi
     
+    if [[ -n "${AAP_EE_ID:-}" ]]; then
+        echo "Execution Environment: Workshop-EE-${WORKSHOP_GUID} (ID: ${AAP_EE_ID})"
+        echo "  Image: ${EE_IMAGE_NAME:-aap-workshop-ee:${WORKSHOP_GUID}}"
+    fi
+    
     echo
     echo "Job Templates Created:"
     echo "  • Module1-Dynamic-Inventory-${WORKSHOP_GUID}"
@@ -136,6 +141,12 @@ cleanup_aap_resources() {
         aap_api_call "DELETE" "/credentials/${AAP_CREDENTIAL_ID}/" ""
     fi
     
+    # Delete execution environment
+    if [[ -n "${AAP_EE_ID:-}" ]]; then
+        log "Deleting execution environment ID: ${AAP_EE_ID}"
+        aap_api_call "DELETE" "/execution_environments/${AAP_EE_ID}/" ""
+    fi
+    
     log "AAP resources cleanup completed"
 }
 
@@ -148,12 +159,14 @@ USAGE:
 
 COMMANDS:
     setup       Set up all AAP resources for the workshop (default)
+    build-ee    Build execution environment only  
     show        Display information about created resources
     cleanup     Remove all workshop resources from AAP
     help        Show this help message
 
 EXAMPLES:
     $0 setup         # Create all AAP resources
+    $0 build-ee      # Build execution environment only
     $0 show          # Show created resources  
     $0 cleanup       # Remove all resources
 
@@ -176,8 +189,12 @@ main() {
     case "${command}" in
         setup)
             check_aap_prerequisites
+            setup_execution_environment
             setup_aap_resources
             show_aap_resources
+            ;;
+        build-ee)
+            setup_execution_environment
             ;;
         show)
             show_aap_resources
