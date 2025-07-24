@@ -611,10 +611,18 @@ main() {
     # Get list of users to validate
     local users=()
     if [[ -n "${user_range}" ]]; then
-        mapfile -t users < <(parse_user_range "${user_range}")
+        local user_list
+        user_list=$(parse_user_range "${user_range}")
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && users+=("$line")
+        done <<< "$user_list"
     else
-        mapfile -t users < <(find "${USER_ENV_DIR}" -name ".env[0-9][0-9]" -type f | \
-                            sed 's/.*\.env\([0-9][0-9]\)/\1/' | sort)
+        local user_list
+        user_list=$(find "${USER_ENV_DIR}" -name ".env[0-9][0-9]" -type f | \
+                   sed 's/.*\.env\([0-9][0-9]\)/\1/' | sort)
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && users+=("$line")
+        done <<< "$user_list"
     fi
     
     if [[ ${#users[@]} -eq 0 ]]; then

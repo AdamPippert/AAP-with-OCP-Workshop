@@ -157,11 +157,21 @@ get_user_list() {
     
     if [[ -n "${user_range}" ]]; then
         # Use specified range
-        mapfile -t users < <(parse_user_range "${user_range}")
+        local user_list
+        user_list=$(parse_user_range "${user_range}")
+        users=()
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && users+=("$line")
+        done <<< "$user_list"
     else
         # Auto-detect all users
-        mapfile -t users < <(find "${USER_ENV_DIR}" -name ".env[0-9][0-9]" -type f | \
-                            sed 's/.*\.env\([0-9][0-9]\)/\1/' | sort)
+        local user_list
+        user_list=$(find "${USER_ENV_DIR}" -name ".env[0-9][0-9]" -type f | \
+                   sed 's/.*\.env\([0-9][0-9]\)/\1/' | sort)
+        users=()
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && users+=("$line")
+        done <<< "$user_list"
     fi
     
     # Filter for resume mode
@@ -564,8 +574,12 @@ main() {
     create_log_directory
     
     # Get list of users to process
-    local users
-    mapfile -t users < <(get_user_list "${user_range}" "${resume_mode}")
+    local users=()
+    local user_list
+    user_list=$(get_user_list "${user_range}" "${resume_mode}")
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && users+=("$line")
+    done <<< "$user_list"
     
     if [[ ${#users[@]} -eq 0 ]]; then
         if [[ "${resume_mode}" == "true" ]]; then

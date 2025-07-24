@@ -459,9 +459,17 @@ main() {
     # Determine users to process
     local users=()
     if [[ -n "$users_range" ]]; then
-        readarray -t users < <(parse_user_range "$users_range")
+        local user_list
+        user_list=$(parse_user_range "$users_range")
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && users+=("$line")
+        done <<< "$user_list"
     else
-        readarray -t users < <(discover_users "$env_dir")
+        local user_list
+        user_list=$(discover_users "$env_dir")
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && users+=("$line")
+        done <<< "$user_list"
     fi
     
     if [[ ${#users[@]} -eq 0 ]]; then
