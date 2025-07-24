@@ -345,7 +345,8 @@ deploy_users_parallel() {
         # Wait if we've reached the parallel limit
         while [[ $running -ge $parallel ]]; do
             # Check for completed processes
-            for i in "${!pids[@]}"; do
+            if [[ ${#pids[@]} -gt 0 ]]; then
+                for i in "${!pids[@]}"; do
                 if ! kill -0 "${pids[$i]}" 2>/dev/null; then
                     wait "${pids[$i]}"
                     local exit_code=$?
@@ -357,7 +358,8 @@ deploy_users_parallel() {
                     unset 'pids[$i]'
                     ((running--))
                 fi
-            done
+                done
+            fi
             sleep 1
         done
         
@@ -368,17 +370,19 @@ deploy_users_parallel() {
     done
     
     # Wait for all remaining processes
-    for pid in "${pids[@]}"; do
-        if kill -0 "$pid" 2>/dev/null; then
-            wait "$pid"
-            local exit_code=$?
-            if [[ $exit_code -eq 0 ]]; then
-                ((success++))
-            else
-                ((failed++))
+    if [[ ${#pids[@]} -gt 0 ]]; then
+        for pid in "${pids[@]}"; do
+            if kill -0 "$pid" 2>/dev/null; then
+                wait "$pid"
+                local exit_code=$?
+                if [[ $exit_code -eq 0 ]]; then
+                    ((success++))
+                else
+                    ((failed++))
+                fi
             fi
-        fi
-    done
+        done
+    fi
     
     log_info "Deployment complete: $success successful, $failed failed"
     return $failed

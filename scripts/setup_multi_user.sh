@@ -189,10 +189,18 @@ get_user_list() {
                 filtered_users+=("${user}")
             fi
         done
-        users=("${filtered_users[@]}")
+        # Handle empty array case for bash set -u compatibility
+        if [[ ${#filtered_users[@]} -gt 0 ]]; then
+            users=("${filtered_users[@]}")
+        else
+            users=()
+        fi
     fi
     
-    printf '%s\n' "${users[@]}"
+    # Handle empty array case for bash set -u compatibility
+    if [[ ${#users[@]} -gt 0 ]]; then
+        printf '%s\n' "${users[@]}"
+    fi
 }
 
 setup_user_environment() {
@@ -348,7 +356,8 @@ run_parallel_setups() {
         while [[ ${running} -ge ${max_parallel} ]]; do
             # Check for completed processes
             local new_pids=()
-            for pid in "${pids[@]}"; do
+            if [[ ${#pids[@]} -gt 0 ]]; then
+                for pid in "${pids[@]}"; do
                 if kill -0 "${pid}" 2>/dev/null; then
                     new_pids+=("${pid}")
                 else
@@ -361,8 +370,14 @@ run_parallel_setups() {
                     fi
                     ((running--))
                 fi
-            done
-            pids=("${new_pids[@]}")
+                done
+            fi
+            # Handle empty array case for bash set -u compatibility
+            if [[ ${#new_pids[@]} -gt 0 ]]; then
+                pids=("${new_pids[@]}")
+            else
+                pids=()
+            fi
             
             if [[ ${running} -ge ${max_parallel} ]]; then
                 sleep 2
@@ -381,7 +396,7 @@ run_parallel_setups() {
     done
     
     # Wait for all remaining processes
-    if [[ "${dry_run}" == "false" ]]; then
+    if [[ "${dry_run}" == "false" && ${#pids[@]} -gt 0 ]]; then
         for pid in "${pids[@]}"; do
             wait "${pid}"
             local exit_code=$?
