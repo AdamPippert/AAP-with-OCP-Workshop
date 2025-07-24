@@ -1,0 +1,61 @@
+---
+# Tasks for creating custom namespace Role
+
+- name: "Create custom Role for namespace-specific IMS operations"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: Role
+      metadata:
+        name: "{{ ims_rbac_namespace_role.name }}"
+        namespace: "{{ ims_rbac_namespace }}"
+        labels: "{{ ims_rbac_labels }}"
+        annotations: "{{ ims_rbac_annotations | combine({'description': ims_rbac_namespace_role.description}) }}"
+      rules:
+      # Core resource management
+      - apiGroups: [""]
+        resources: ["pods", "services", "configmaps", "secrets"]
+        verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      - apiGroups: [""]
+        resources: ["pods/log"]
+        verbs: ["get", "list"]
+      # Conditional exec access based on environment
+      - apiGroups: [""]
+        resources: ["pods/exec"]
+        verbs: ["create"]
+        resourceNames: []
+      # Application management
+      - apiGroups: ["apps"]
+        resources: ["deployments", "replicasets"]
+        verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      - apiGroups: ["apps"]
+        resources: ["deployments/scale"]
+        verbs: ["update", "patch"]
+      # Service management
+      - apiGroups: [""]
+        resources: ["endpoints"]
+        verbs: ["get", "list", "watch"]
+      # Networking
+      - apiGroups: ["networking.k8s.io"]
+        resources: ["networkpolicies"]
+        verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      # OpenShift routes
+      - apiGroups: ["route.openshift.io"]  
+        resources: ["routes"]
+        verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      # Events for troubleshooting
+      - apiGroups: [""]
+        resources: ["events"]
+        verbs: ["get", "list", "watch"]
+      # PersistentVolumeClaims for IMS data
+      - apiGroups: [""]
+        resources: ["persistentvolumeclaims"]
+        verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  register: ims_namespace_role_result
+
+- name: "Display namespace Role creation status"
+  ansible.builtin.debug:
+    msg: |
+      Role {{ ims_rbac_namespace_role.name }}: {{ 'Created' if ims_namespace_role_result.changed else 'Already exists' }}
+    verbosity: 1

@@ -1,0 +1,65 @@
+---
+# Tasks for creating SecurityContextConstraints
+
+- name: "Create SecurityContextConstraints for IMS workloads"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: security.openshift.io/v1
+      kind: SecurityContextConstraints
+      metadata:
+        name: "{{ ims_rbac_scc.name }}"
+        labels: "{{ ims_rbac_labels }}"
+        annotations: "{{ ims_rbac_annotations | combine({
+          'description': ims_rbac_scc.description,
+          'kubernetes.io/description': 'IMS-specific security constraints for mainframe connectivity'
+        }) }}"
+      allowHostDirVolumePlugin: false
+      allowHostIPC: false
+      allowHostNetwork: false
+      allowHostPID: false
+      allowHostPorts: false
+      allowPrivilegedContainer: false
+      allowedCapabilities: []
+      defaultAddCapabilities: []
+      fsGroup:
+        type: MustRunAs
+        ranges:
+        - min: "{{ ims_rbac_scc.fsgroup_range.min }}"
+          max: "{{ ims_rbac_scc.fsgroup_range.max }}"
+      readOnlyRootFilesystem: false
+      requiredDropCapabilities:
+      - ALL
+      runAsUser:
+        type: MustRunAsRange
+        uidRangeMin: "{{ ims_rbac_scc.uid_range.min }}"
+        uidRangeMax: "{{ ims_rbac_scc.uid_range.max }}"
+      seLinuxContext:
+        type: MustRunAs
+      supplementalGroups:
+        type: MustRunAs
+        ranges:
+        - min: "{{ ims_rbac_scc.fsgroup_range.min }}"
+          max: "{{ ims_rbac_scc.fsgroup_range.max }}"
+      volumes:
+      - configMap
+      - downwardAPI
+      - emptyDir
+      - persistentVolumeClaim
+      - projected
+      - secret
+      users:
+      # Add primary IMS service account
+      - "system:serviceaccount:{{ ims_rbac_namespace }}:ims-connector-sa"
+      # Add operator service account for production maintenance
+      - "system:serviceaccount:{{ ims_rbac_namespace }}:ims-operator"
+      groups: []
+  register: ims_scc_result
+
+- name: "Display SecurityContextConstraints creation status"
+  ansible.builtin.debug:
+    msg: |
+      SecurityContextConstraints {{ ims_rbac_scc.name }}: {{ 'Created' if ims_scc_result.changed else 'Already exists' }}
+      UID Range: {{ ims_rbac_scc.uid_range.min }}-{{ ims_rbac_scc.uid_range.max }}
+      FSGroup Range: {{ ims_rbac_scc.fsgroup_range.min }}-{{ ims_rbac_scc.fsgroup_range.max }}
+    verbosity: 1

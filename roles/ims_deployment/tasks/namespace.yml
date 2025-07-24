@@ -1,0 +1,28 @@
+---
+# Tasks for namespace management
+
+- name: "Create namespace with proper labels and annotations"
+  kubernetes.core.k8s:
+    name: "{{ ims_deployment_namespace }}"
+    api_version: v1
+    kind: Namespace
+    state: present
+    definition:
+      metadata:
+        labels: "{{ ims_deployment_labels | combine({
+          'workshop.redhat.com/module': 'module2',
+          'workshop.redhat.com/environment': ims_deployment_environment
+        }) }}"
+        annotations: "{{ ims_deployment_annotations | combine({
+          'workshop.redhat.com/created-by': ansible_user | default('workshop-user'),
+          'description': 'IMS Workshop Module 2 - Idempotent Resource Management'
+        }) }}"
+  register: ims_namespace_result
+
+- name: "Display namespace creation status"
+  ansible.builtin.debug:
+    msg: |
+      Namespace Status: {{ 'Created' if ims_namespace_result.changed else 'Already exists' }}
+      Namespace: {{ ims_deployment_namespace }}
+      Environment: {{ ims_deployment_environment }}
+    verbosity: 1

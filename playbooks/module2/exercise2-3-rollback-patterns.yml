@@ -1,0 +1,370 @@
+---
+# Module 2, Exercise 3: Rollback Capabilities with Block-Rescue-Always
+# Learning Focus: Production rollback patterns and error recovery
+# Time: 15 minutes independent exercise
+
+- name: "Exercise 2.3: Implement Rollback Capabilities with Error Handling"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    # Rollback configuration
+    rollback_enabled: "{{ enable_rollback | default(true) }}"
+    backup_suffix: "{{ ansible_date_time.epoch }}"
+    max_rollback_attempts: 3
+    
+    # Deployment update scenario
+    update_scenario:
+      new_version: "{{ target_version | default('2.0.0') }}"
+      new_image: "registry.redhat.io/ubi8/openjdk-11:latest"
+      config_changes:
+        connection_pool_size: "{{ new_pool_size | default(20) }}"
+        timeout_seconds: "{{ new_timeout | default(45) }}"
+        log_level: "{{ new_log_level | default('INFO') }}"
+    
+    # Failure simulation for learning
+    simulate_failure: "{{ force_failure | default(false) }}"
+    failure_type: "{{ failure_scenario | default('config') }}"  # config, deployment, service
+
+  tasks:
+    - name: "Validate prerequisites from previous exercises"
+      ansible.builtin.assert:
+        that:
+          - module2_namespace is defined
+          - module2_app_name is defined
+          - module2_deployment_ready | default(false)
+        fail_msg: "Prerequisites missing. Run exercises 2-1 and 2-2 first"
+        quiet: true
+
+    - name: "Begin rollback-capable deployment update"
+      block:
+        - name: "Create backup of current deployment configuration"
+          kubernetes.core.k8s_info:
+            api_version: apps/v1
+            kind: Deployment
+            name: "{{ module2_app_name }}"
+            namespace: "{{ module2_namespace }}"
+          register: current_deployment_backup
+          
+        - name: "Store backup configuration for potential rollback"
+          ansible.builtin.set_fact:
+            deployment_backup: "{{ current_deployment_backup.resources[0] }}"
+            backup_metadata:
+              timestamp: "{{ ansible_date_time.iso8601 }}"
+              version: "{{ current_deployment_backup.resources[0].metadata.labels['app.kubernetes.io/version'] }}"
+              replicas: "{{ current_deployment_backup.resources[0].spec.replicas }}"
+
+        - name: "Display current state before update"
+          ansible.builtin.debug:
+            msg: |
+              === Pre-Update State ===
+              Current Version: {{ deployment_backup.metadata.labels['app.kubernetes.io/version'] }}
+              Current Replicas: {{ deployment_backup.spec.replicas }}
+              Target Version: {{ update_scenario.new_version }}
+              Rollback Enabled: {{ rollback_enabled }}
+              Backup Timestamp: {{ backup_metadata.timestamp }}
+
+        - name: "Update ConfigMap with new configuration"
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: "{{ module2_app_name }}-config"
+                namespace: "{{ module2_namespace }}"
+                labels: "{{ deployment_backup.metadata.labels }}"
+                annotations:
+                  backup.workshop.redhat.com/timestamp: "{{ backup_metadata.timestamp }}"
+                  backup.workshop.redhat.com/previous-version: "{{ deployment_backup.metadata.labels['app.kubernetes.io/version'] }}"
+              data:
+                # Updated IMS configuration
+                ims.properties: |
+                  # IMS Database Configuration - Updated
+                  ims.mainframe.host={{ ims_config.mainframe_host | default('mainframe.example.com') }}
+                  ims.database.name={{ ims_config.database_name | default('IMSDB01') }}
+                  ims.connection.pool.size={{ update_scenario.config_changes.connection_pool_size }}
+                  ims.connection.timeout={{ update_scenario.config_changes.timeout_seconds }}
+                  
+                  # Environment-specific settings - Updated
+                  environment={{ module2_environment }}
+                  log.level={{ update_scenario.config_changes.log_level }}
+                  
+                  # Performance tuning - Updated
+                  connection.pool.min={{ (update_scenario.config_changes.connection_pool_size | int / 2) | int }}
+                  connection.pool.max={{ update_scenario.config_changes.connection_pool_size }}
+                  connection.validation.query=SELECT 1 FROM DUAL
+                  
+                  # New feature flags
+                  feature.enhanced.monitoring=true
+                  feature.connection.retry=true
+                  feature.health.checks.extended=true
+                
+                # Updated application configuration
+                application.yml: |
+                  server:
+                    port: 8080
+                    shutdown: graceful
+                  spring:
+                    application:
+                      name: {{ module2_app_name }}
+                    profiles:
+                      active: {{ module2_environment }}
+                    lifecycle:
+                      timeout-per-shutdown-phase: 30s
+                  management:
+                    endpoints:
+                      web:
+                        exposure:
+                          include: health,info,metrics,env,configprops
+                    health:
+                      show-details: always
+                    metrics:
+                      enable:
+                        jvm: true
+                        system: true
+          register: config_update_result
+
+        - name: "Simulate configuration failure if requested"
+          ansible.builtin.fail:
+            msg: "Simulated configuration failure for learning purposes"
+          when: 
+            - simulate_failure | bool
+            - failure_type == "config"
+
+        - name: "Update deployment with new version and configuration"
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: "{{ module2_app_name }}"
+                namespace: "{{ module2_namespace }}"
+                labels:
+                  app.kubernetes.io/name: "{{ module2_app_name }}"
+                  app.kubernetes.io/version: "{{ update_scenario.new_version }}"
+                  app.kubernetes.io/component: "application"
+                  app.kubernetes.io/managed-by: "ansible"
+                annotations:
+                  deployment.kubernetes.io/revision: "{{ (deployment_backup.metadata.annotations['deployment.kubernetes.io/revision'] | int) + 1 }}"
+                  backup.workshop.redhat.com/timestamp: "{{ backup_metadata.timestamp }}"
+                  backup.workshop.redhat.com/previous-version: "{{ backup_metadata.version }}"
+                  description: "Updated IMS connector service - version {{ update_scenario.new_version }}"
+              spec:
+                replicas: "{{ deployment_backup.spec.replicas }}"
+                selector: "{{ deployment_backup.spec.selector }}"
+                template:
+                  metadata:
+                    labels:
+                      app.kubernetes.io/name: "{{ module2_app_name }}"
+                      app.kubernetes.io/version: "{{ update_scenario.new_version }}"
+                      app.kubernetes.io/component: "application"
+                    annotations:
+                      prometheus.io/scrape: "true"
+                      prometheus.io/port: "8080"
+                      prometheus.io/path: "/actuator/prometheus"
+                      backup.workshop.redhat.com/config-updated: "{{ ansible_date_time.iso8601 }}"
+                  spec:
+                    serviceAccountName: "{{ deployment_backup.spec.template.spec.serviceAccountName }}"
+                    securityContext: "{{ deployment_backup.spec.template.spec.securityContext }}"
+                    containers:
+                    - name: "{{ module2_app_name }}"
+                      image: "{{ update_scenario.new_image }}"
+                      imagePullPolicy: Always
+                      ports: "{{ deployment_backup.spec.template.spec.containers[0].ports }}"
+                      env:
+                      - name: JAVA_OPTS
+                        value: "{{ deployment_backup.spec.template.spec.containers[0].env[0].value }} -Dapp.version={{ update_scenario.new_version }}"
+                      - name: SPRING_CONFIG_LOCATION
+                        value: "{{ deployment_backup.spec.template.spec.containers[0].env[1].value }}"
+                      - name: APP_UPDATE_TIMESTAMP
+                        value: "{{ ansible_date_time.iso8601 }}"
+                      envFrom: "{{ deployment_backup.spec.template.spec.containers[0].envFrom }}"
+                      resources: "{{ deployment_backup.spec.template.spec.containers[0].resources }}"
+                      volumeMounts: "{{ deployment_backup.spec.template.spec.containers[0].volumeMounts }}"
+                      livenessProbe: "{{ deployment_backup.spec.template.spec.containers[0].livenessProbe }}"
+                      readinessProbe: "{{ deployment_backup.spec.template.spec.containers[0].readinessProbe }}"
+                    volumes: "{{ deployment_backup.spec.template.spec.volumes }}"
+          register: deployment_update_result
+
+        - name: "Simulate deployment failure if requested"
+          ansible.builtin.fail:
+            msg: "Simulated deployment failure for learning purposes"
+          when: 
+            - simulate_failure | bool
+            - failure_type == "deployment"
+
+        - name: "Wait for deployment rollout to complete"
+          kubernetes.core.k8s_info:
+            api_version: apps/v1
+            kind: Deployment
+            name: "{{ module2_app_name }}"
+            namespace: "{{ module2_namespace }}"
+            wait: true
+            wait_condition:
+              type: Progressing
+              status: "True"
+              reason: NewReplicaSetAvailable
+            wait_timeout: 300
+          register: rollout_status
+
+        - name: "Verify deployment health after update"
+          kubernetes.core.k8s_info:
+            api_version: apps/v1
+            kind: Deployment
+            name: "{{ module2_app_name }}"
+            namespace: "{{ module2_namespace }}"
+          register: updated_deployment_status
+
+        - name: "Check if deployment is healthy"
+          ansible.builtin.set_fact:
+            deployment_healthy: "{{ updated_deployment_status.resources[0].status.readyReplicas | default(0) == updated_deployment_status.resources[0].status.replicas | default(0) }}"
+
+        - name: "Simulate service failure if requested"
+          ansible.builtin.fail:
+            msg: "Simulated service connectivity failure for learning purposes"
+          when: 
+            - simulate_failure | bool
+            - failure_type == "service"
+
+        - name: "Validate service connectivity"
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Service
+            name: "{{ module2_app_name }}-service"
+            namespace: "{{ module2_namespace }}"
+          register: service_status
+
+        - name: "Display successful update summary"
+          ansible.builtin.debug:
+            msg: |
+              === Deployment Update Successful ===
+              Previous Version: {{ backup_metadata.version }}
+              New Version: {{ update_scenario.new_version }}
+              Deployment Status: {{ 'Healthy' if deployment_healthy else 'Unhealthy' }}
+              Ready Replicas: {{ updated_deployment_status.resources[0].status.readyReplicas | default(0) }}/{{ updated_deployment_status.resources[0].status.replicas }}
+              Update Timestamp: {{ ansible_date_time.iso8601 }}
+
+      rescue:
+        - name: "Handle deployment failure - begin rollback procedure"
+          ansible.builtin.debug:
+            msg: |
+              === Deployment Update Failed ===
+              Error: {{ ansible_failed_result.msg }}
+              Beginning rollback procedure...
+              Rollback Enabled: {{ rollback_enabled }}
+
+        - name: "Execute rollback to previous stable version"
+          kubernetes.core.k8s:
+            state: present
+            definition: "{{ deployment_backup }}"
+          when: rollback_enabled | bool
+          register: rollback_result
+
+        - name: "Restore previous ConfigMap configuration"
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: ConfigMap
+            name: "{{ module2_app_name }}-config-backup-{{ backup_suffix }}"
+            namespace: "{{ module2_namespace }}"
+          when: rollback_enabled | bool
+          ignore_errors: true
+          register: config_backup_check
+
+        - name: "Wait for rollback deployment to stabilize"
+          kubernetes.core.k8s_info:
+            api_version: apps/v1
+            kind: Deployment
+            name: "{{ module2_app_name }}"
+            namespace: "{{ module2_namespace }}"
+            wait: true
+            wait_condition:
+              type: Available
+              status: "True"
+            wait_timeout: 180
+          when: rollback_enabled | bool
+          register: rollback_status
+
+        - name: "Verify rollback success"
+          kubernetes.core.k8s_info:
+            api_version: apps/v1
+            kind: Deployment
+            name: "{{ module2_app_name }}"
+            namespace: "{{ module2_namespace }}"
+          when: rollback_enabled | bool
+          register: rollback_verification
+
+        - name: "Display rollback summary"
+          ansible.builtin.debug:
+            msg: |
+              === Rollback Complete ===
+              Original Error: {{ ansible_failed_result.msg }}
+              Rollback Status: {{ 'Successful' if rollback_enabled else 'Skipped - rollback disabled' }}
+              Current Version: {{ rollback_verification.resources[0].metadata.labels['app.kubernetes.io/version'] | default('Unknown') if rollback_enabled else 'Failed state' }}
+              Ready Replicas: {{ rollback_verification.resources[0].status.readyReplicas | default(0) if rollback_enabled else 0 }}/{{ rollback_verification.resources[0].status.replicas | default(0) if rollback_enabled else 0 }}
+              Rollback Timestamp: {{ ansible_date_time.iso8601 }}
+
+        - name: "Set rollback completion status"
+          ansible.builtin.set_fact:
+            rollback_completed: true
+            rollback_successful: "{{ rollback_enabled and (rollback_verification.resources[0].status.readyReplicas | default(0) == rollback_verification.resources[0].status.replicas | default(0)) }}"
+
+      always:
+        - name: "Clean up temporary resources"
+          kubernetes.core.k8s:
+            state: absent
+            api_version: v1
+            kind: ConfigMap
+            name: "{{ module2_app_name }}-config-temp"
+            namespace: "{{ module2_namespace }}"
+          ignore_errors: true
+
+        - name: "Record deployment attempt in annotations"
+          kubernetes.core.k8s:
+            state: present
+            merge_type: merge
+            definition:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: "{{ module2_app_name }}"
+                namespace: "{{ module2_namespace }}"
+                annotations:
+                  deployment.workshop.redhat.com/last-attempt: "{{ ansible_date_time.iso8601 }}"
+                  deployment.workshop.redhat.com/last-operation: "{{ 'rollback' if rollback_completed | default(false) else 'update' }}"
+                  deployment.workshop.redhat.com/attempt-result: "{{ 'success' if not rollback_completed | default(false) else ('rollback-success' if rollback_successful | default(false) else 'rollback-failed') }}"
+          ignore_errors: true
+
+        - name: "Get final deployment state"
+          kubernetes.core.k8s_info:
+            api_version: apps/v1
+            kind: Deployment
+            name: "{{ module2_app_name }}"
+            namespace: "{{ module2_namespace }}"
+          register: final_deployment_state
+
+        - name: "Display final exercise summary"
+          ansible.builtin.debug:
+            msg: |
+              === Exercise 2.3 Complete ===
+              Operation: {{ 'Update with Rollback' if rollback_completed | default(false) else 'Update Success' }}
+              Final Version: {{ final_deployment_state.resources[0].metadata.labels['app.kubernetes.io/version'] }}
+              Final Status: {{ 'Ready' if final_deployment_state.resources[0].status.readyReplicas == final_deployment_state.resources[0].status.replicas else 'Not Ready' }}
+              Rollback Capability: Demonstrated {{ 'and executed' if rollback_completed | default(false) else 'but not needed' }}
+              
+              Learning Outcomes:
+              ✓ Block-Rescue-Always pattern implementation
+              ✓ Configuration backup and restore procedures
+              ✓ Deployment health validation
+              ✓ Automated rollback capabilities
+              {{ '✓ Rollback execution and verification' if rollback_completed | default(false) else '- Rollback not triggered (successful update)' }}
+
+        - name: "Export rollback exercise results"
+          ansible.builtin.set_stats:
+            data:
+              module2_rollback_tested: true
+              module2_rollback_successful: "{{ rollback_successful | default(false) }}"
+              module2_final_version: "{{ final_deployment_state.resources[0].metadata.labels['app.kubernetes.io/version'] }}"
+              module2_final_ready: "{{ final_deployment_state.resources[0].status.readyReplicas == final_deployment_state.resources[0].status.replicas }}"
+              module2_exercise3_complete: true

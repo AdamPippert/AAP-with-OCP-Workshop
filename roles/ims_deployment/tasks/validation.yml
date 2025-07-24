@@ -1,0 +1,47 @@
+---
+# Tasks for deployment validation
+
+- name: "Wait for deployment to be ready"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: "{{ ims_deployment_app_name }}"
+    namespace: "{{ ims_deployment_namespace }}"
+    wait: true
+    wait_condition:
+      type: Available
+      status: "True"
+    wait_timeout: "{{ ims_deployment_validation.wait_timeout }}"
+  register: ims_deployment_status
+
+- name: "Verify deployment readiness"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: "{{ ims_deployment_app_name }}"
+    namespace: "{{ ims_deployment_namespace }}"
+  register: ims_final_deployment_state
+
+- name: "Calculate deployment health status"
+  ansible.builtin.set_fact:
+    ims_deployment_healthy: "{{ 
+      ims_final_deployment_state.resources[0].status.readyReplicas | default(0) == 
+      ims_deployment_resource_specs[ims_deployment_environment].replicas 
+    }}"
+    ims_deployment_ready_replicas: "{{ ims_final_deployment_state.resources[0].status.readyReplicas | default(0) }}"
+    ims_deployment_total_replicas: "{{ ims_deployment_resource_specs[ims_deployment_environment].replicas }}"
+
+- name: "Display deployment validation results"
+  ansible.builtin.debug:
+    msg: |
+      === IMS Deployment Validation ===
+      Deployment Status: {{ 'Ready' if ims_deployment_healthy else 'Not Ready' }}
+      Ready Replicas: {{ ims_deployment_ready_replicas }}/{{ ims_deployment_total_replicas }}
+      Environment: {{ ims_deployment_environment }}
+      Application: {{ ims_deployment_app_name }} v{{ ims_deployment_app_version }}
+
+- name: "Set deployment completion facts"
+  ansible.builtin.set_fact:
+    ims_deployment_complete: "{{ ims_deployment_healthy }}"
+    ims_deployment_namespace_created: "{{ ims_namespace_result.changed | default(false) }}"
+    ims_deployment_service_ready: "{{ ims_service_result is defined }}"

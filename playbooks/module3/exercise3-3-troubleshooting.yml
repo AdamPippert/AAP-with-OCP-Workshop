@@ -1,0 +1,578 @@
+---
+# Module 3, Exercise 3: Advanced Troubleshooting and Diagnostic Automation
+# Learning Focus: Systematic troubleshooting approaches for IMS mainframe integration
+# Time: 15 minutes guided practice
+
+- name: "Exercise 3.3: Advanced Troubleshooting and Diagnostic Validation for IMS Systems"
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars:
+    # Build on previous exercise configurations
+    target_namespace: "{{ hostvars['localhost']['module3_error_handling_namespace'] | default('ims-advanced-' + ansible_date_time.epoch) }}"
+    app_name: "{{ hostvars['localhost']['module3_error_handling_app'] | default('ims-transaction-processor') }}"
+    workshop_environment: "{{ hostvars['localhost']['module3_environment'] | default('dev') }}"
+    
+    # Comprehensive diagnostic configuration
+    diagnostic_config:
+      health_checks:
+        - name: "kubernetes_connectivity"
+          type: "cluster"
+          description: "Verify cluster API connectivity and permissions"
+          timeout: 30
+          critical: true
+        - name: "namespace_resources"
+          type: "namespace"
+          description: "Check namespace quotas and resource availability"
+          timeout: 15
+          critical: true
+        - name: "application_pods"
+          type: "workload"
+          description: "Validate pod status, readiness, and resource usage"
+          timeout: 60
+          critical: true
+        - name: "service_connectivity"
+          type: "network"
+          description: "Test service discovery and network connectivity"
+          timeout: 45
+          critical: false
+        - name: "mainframe_endpoints"
+          type: "external"
+          description: "Verify mainframe connectivity and response times"
+          timeout: 120
+          critical: true
+        - name: "database_connections"
+          type: "data"
+          description: "Test IMS database connectivity and pool status"
+          timeout: 90
+          critical: true
+        - name: "configuration_integrity"
+          type: "config"
+          description: "Validate configuration consistency and completeness"
+          timeout: 30
+          critical: false
+        - name: "security_compliance"
+          type: "security"
+          description: "Check RBAC, secrets, and security policies"
+          timeout: 45
+          critical: false
+
+      performance_metrics:
+        cpu_threshold: 80
+        memory_threshold: 85
+        response_time_threshold: 5000
+        error_rate_threshold: 5
+        connection_pool_utilization: 90
+
+      troubleshooting_scenarios:
+        - scenario: "pod_crashloop"
+          description: "Pod is in CrashLoopBackOff state"
+          checks:
+            - "container_logs"
+            - "resource_limits"
+            - "configuration_validation"
+            - "health_probe_configuration"
+          remediation:
+            - "check_application_logs"
+            - "verify_configuration"
+            - "adjust_resource_limits"
+            - "fix_health_probes"
+        - scenario: "connection_timeout"
+          description: "Mainframe connection timeouts"
+          checks:
+            - "network_connectivity"
+            - "dns_resolution"
+            - "firewall_rules"
+            - "connection_pool_status"
+          remediation:
+            - "verify_network_policies"
+            - "check_mainframe_availability"
+            - "adjust_timeout_settings"
+            - "scale_connection_pools"
+        - scenario: "high_error_rate"
+          description: "Elevated transaction error rates"
+          checks:
+            - "application_metrics"
+            - "circuit_breaker_status"
+            - "retry_policy_effectiveness"
+            - "mainframe_capacity"
+          remediation:
+            - "analyze_error_patterns"
+            - "tune_retry_policies"
+            - "implement_backpressure"
+            - "coordinate_with_mainframe_team"
+        - scenario: "resource_exhaustion"
+          description: "High CPU/memory usage or resource limits"
+          checks:
+            - "pod_resource_usage"
+            - "namespace_quotas"
+            - "jvm_heap_analysis"
+            - "connection_pool_leaks"
+          remediation:
+            - "increase_resource_limits"
+            - "implement_horizontal_scaling"
+            - "optimize_jvm_settings"
+            - "fix_connection_leaks"
+
+    # Advanced validation rules
+    validation_rules:
+      deployment_validation:
+        - rule: "all_pods_ready"
+          description: "All pods must be in Ready state"
+          query: ".status.readyReplicas == .spec.replicas"
+          severity: "critical"
+        - rule: "no_restart_loops"
+          description: "Pod restart count should be low"
+          query: ".status.containerStatuses[].restartCount"
+          threshold: 5
+          severity: "warning"
+        - rule: "resource_utilization"
+          description: "CPU and memory usage within limits"
+          severity: "warning"
+      
+      configuration_validation:
+        - rule: "required_environment_variables"
+          description: "All required environment variables present"
+          variables:
+            - "IMS_ENVIRONMENT"
+            - "SPRING_PROFILES_ACTIVE"
+            - "ERROR_HANDLING_MODE"
+          severity: "critical"
+        - rule: "configuration_consistency"
+          description: "ConfigMap and Secret checksums match"
+          severity: "warning"
+      
+      network_validation:
+        - rule: "service_endpoints"
+          description: "Service has healthy endpoints"
+          severity: "critical"
+        - rule: "dns_resolution"
+          description: "Service DNS names resolve correctly"
+          severity: "warning"
+
+  tasks:
+    - name: "Initialize diagnostic session"
+      ansible.builtin.debug:
+        msg: |
+          === IMS Advanced Troubleshooting and Diagnostic Session ===
+          
+          Session Details:
+          - Target Namespace: {{ target_namespace }}
+          - Application: {{ app_name }}
+          - Environment: {{ workshop_environment | upper }}
+          - Diagnostic Checks: {{ diagnostic_config.health_checks | length }}
+          - Troubleshooting Scenarios: {{ diagnostic_config.troubleshooting_scenarios | length }}
+          - Validation Rules: {{ validation_rules.keys() | length }} categories
+          
+          Diagnostic Mode: {{ 'Production (Comprehensive)' if workshop_environment in ['test', 'prod'] else 'Development (Essential)' }}
+
+    - name: "Execute comprehensive health checks"
+      block:
+        - name: "Check 1: Kubernetes Connectivity and Permissions"
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Namespace
+            name: "{{ target_namespace }}"
+          register: namespace_connectivity
+          
+        - name: "Check 2: Namespace Resources and Quotas"
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: ResourceQuota
+            namespace: "{{ target_namespace }}"
+          register: resource_quotas
+          failed_when: false
+          
+        - name: "Check 3: Application Pod Status"
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Pod
+            namespace: "{{ target_namespace }}"
+            label_selectors:
+              - "app.kubernetes.io/name={{ app_name }}"
+          register: app_pods
+          
+        - name: "Check 4: Service and Endpoint Status"
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Service
+            namespace: "{{ target_namespace }}"
+            label_selectors:
+              - "app.kubernetes.io/name={{ app_name }}"
+          register: app_services
+          failed_when: false
+          
+        - name: "Check 5: Deployment Status and History"
+          kubernetes.core.k8s_info:
+            api_version: apps/v1
+            kind: Deployment
+            name: "{{ app_name }}"
+            namespace: "{{ target_namespace }}"
+          register: deployment_status
+          
+        - name: "Check 6: ConfigMap and Secret Integrity"
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: ConfigMap
+            namespace: "{{ target_namespace }}"
+            label_selectors:
+              - "app.kubernetes.io/name={{ app_name }}"
+          register: configmap_status
+          
+        - name: "Check 7: HorizontalPodAutoscaler Status"
+          kubernetes.core.k8s_info:
+            api_version: autoscaling/v2
+            kind: HorizontalPodAutoscaler
+            namespace: "{{ target_namespace }}"
+            name: "{{ app_name }}-hpa"
+          register: hpa_status
+          failed_when: false
+
+      rescue:
+        - name: "Handle diagnostic check failures"
+          ansible.builtin.debug:
+            msg: |
+              ⚠️  Diagnostic Check Failed
+              Error: {{ ansible_failed_result.msg }}
+              
+              This indicates a potential issue that requires investigation.
+              Continuing with remaining diagnostic checks...
+
+    - name: "Analyze pod health and performance"
+      block:
+        - name: "Analyze individual pod status"
+          ansible.builtin.set_fact:
+            pod_analysis: |
+              {% set pods = app_pods.resources %}
+              {% if pods | length == 0 %}
+              No pods found for application {{ app_name }}
+              {% else %}
+              Pod Analysis ({{ pods | length }} pods found):
+              {% for pod in pods %}
+              
+              Pod: {{ pod.metadata.name }}
+              - Status: {{ pod.status.phase }}
+              - Ready: {{ pod.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('Unknown') }}
+              - Restarts: {{ pod.status.containerStatuses[0].restartCount | default(0) if pod.status.containerStatuses else 0 }}
+              - Node: {{ pod.spec.nodeName | default('Unscheduled') }}
+              - Start Time: {{ pod.status.startTime | default('Unknown') }}
+              {% if pod.status.containerStatuses %}
+              - Container State: {{ pod.status.containerStatuses[0].state.keys() | first }}
+              {% if pod.status.containerStatuses[0].state.waiting %}
+              - Waiting Reason: {{ pod.status.containerStatuses[0].state.waiting.reason }}
+              {% endif %}
+              {% endif %}
+              {% endfor %}
+              {% endif %}
+              
+        - name: "Display pod analysis results"
+          ansible.builtin.debug:
+            msg: "{{ pod_analysis }}"
+
+      rescue:
+        - name: "Handle pod analysis failure"
+          ansible.builtin.debug:
+            msg: "Unable to analyze pod status. This may indicate scheduling or resource issues."
+
+    - name: "Perform deployment validation checks"
+      block:
+        - name: "Validate deployment readiness"
+          ansible.builtin.assert:
+            that:
+              - deployment_status.resources | length > 0
+              - deployment_status.resources[0].status.replicas is defined
+              - deployment_status.resources[0].status.readyReplicas | default(0) == deployment_status.resources[0].spec.replicas
+            success_msg: "✅ Deployment validation passed - all replicas are ready"
+            fail_msg: "❌ Deployment validation failed - not all replicas are ready"
+          register: deployment_validation
+          failed_when: false
+          
+        - name: "Check for deployment rollout issues"
+          ansible.builtin.set_fact:
+            deployment_issues: |
+              {% set deploy = deployment_status.resources[0] %}
+              Deployment Issues Analysis:
+              
+              Replica Status:
+              - Desired: {{ deploy.spec.replicas }}
+              - Current: {{ deploy.status.replicas | default(0) }}
+              - Ready: {{ deploy.status.readyReplicas | default(0) }}
+              - Available: {{ deploy.status.availableReplicas | default(0) }}
+              - Updated: {{ deploy.status.updatedReplicas | default(0) }}
+              
+              {% if deploy.status.conditions %}
+              Deployment Conditions:
+              {% for condition in deploy.status.conditions %}
+              - {{ condition.type }}: {{ condition.status }} ({{ condition.reason | default('No reason') }})
+                {% if condition.message %}
+                Message: {{ condition.message }}
+                {% endif %}
+              {% endfor %}
+              {% endif %}
+              
+              {% if deploy.status.readyReplicas | default(0) != deploy.spec.replicas %}
+              ⚠️  ISSUE DETECTED: Not all replicas are ready
+              Troubleshooting Steps:
+              1. Check pod logs: kubectl logs -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }}
+              2. Describe pods: kubectl describe pods -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }}
+              3. Check events: kubectl get events --sort-by=.metadata.creationTimestamp -n {{ target_namespace }}
+              4. Verify resource quotas and limits
+              {% endif %}
+
+      rescue:
+        - name: "Handle validation check failure"
+          ansible.builtin.set_fact:
+            deployment_issues: |
+              ❌ Unable to perform deployment validation checks.
+              This indicates a severe deployment issue.
+              
+              Basic Troubleshooting:
+              1. Verify namespace exists: kubectl get namespace {{ target_namespace }}
+              2. Check deployment exists: kubectl get deployment {{ app_name }} -n {{ target_namespace }}
+              3. Review recent events: kubectl get events -n {{ target_namespace }}
+
+    - name: "Create comprehensive diagnostic report"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: "{{ app_name }}-diagnostic-report"
+            namespace: "{{ target_namespace }}"
+            labels:
+              app.kubernetes.io/name: "{{ app_name }}"
+              app.kubernetes.io/component: "diagnostics"
+              workshop.redhat.com/diagnostic-timestamp: "{{ ansible_date_time.epoch }}"
+            annotations:
+              diagnostic.ims.com/session-id: "{{ ansible_date_time.iso8601 }}"
+              diagnostic.ims.com/environment: "{{ workshop_environment }}"
+          data:
+            diagnostic-summary.json: |
+              {
+                "diagnostic_session": {
+                  "timestamp": "{{ ansible_date_time.iso8601 }}",
+                  "environment": "{{ workshop_environment }}",
+                  "namespace": "{{ target_namespace }}",
+                  "application": "{{ app_name }}"
+                },
+                "health_checks": {
+                  "kubernetes_connectivity": {
+                    "status": "{{ 'PASS' if namespace_connectivity.resources else 'FAIL' }}",
+                    "details": "{{ 'Namespace accessible' if namespace_connectivity.resources else 'Cannot access namespace' }}"
+                  },
+                  "resource_quotas": {
+                    "status": "{{ 'PASS' if resource_quotas.resources else 'INFO' }}",
+                    "quotas_found": {{ resource_quotas.resources | length }},
+                    "details": "{{ 'Resource quotas configured' if resource_quotas.resources else 'No resource quotas found' }}"
+                  },
+                  "application_pods": {
+                    "status": "{{ 'PASS' if app_pods.resources and app_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list else 'FAIL' }}",
+                    "pods_found": {{ app_pods.resources | length }},
+                    "running_pods": {{ app_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list | length if app_pods.resources else 0 }},
+                    "details": "{{ app_pods.resources | length }} pods found, {{ app_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list | length if app_pods.resources else 0 }} running"
+                  },
+                  "services": {
+                    "status": "{{ 'PASS' if app_services.resources else 'WARN' }}",
+                    "services_found": {{ app_services.resources | length }},
+                    "details": "{{ app_services.resources | length }} services found"
+                  },
+                  "deployment": {
+                    "status": "{{ 'PASS' if deployment_status.resources and deployment_status.resources[0].status.readyReplicas | default(0) == deployment_status.resources[0].spec.replicas else 'FAIL' }}",
+                    "desired_replicas": {{ deployment_status.resources[0].spec.replicas if deployment_status.resources else 0 }},
+                    "ready_replicas": {{ deployment_status.resources[0].status.readyReplicas | default(0) if deployment_status.resources else 0 }},
+                    "details": "{{ 'All replicas ready' if deployment_status.resources and deployment_status.resources[0].status.readyReplicas | default(0) == deployment_status.resources[0].spec.replicas else 'Replica mismatch or deployment missing' }}"
+                  },
+                  "configuration": {
+                    "status": "{{ 'PASS' if configmap_status.resources else 'WARN' }}",
+                    "configmaps_found": {{ configmap_status.resources | length }},
+                    "details": "{{ configmap_status.resources | length }} configuration objects found"
+                  },
+                  "autoscaling": {
+                    "status": "{{ 'PASS' if hpa_status.resources else 'INFO' }}",
+                    "hpa_configured": {{ 'true' if hpa_status.resources else 'false' }},
+                    "details": "{{ 'HPA configured' if hpa_status.resources else 'No HPA found' }}"
+                  }
+                },
+                "recommendations": [
+                  {% if not app_pods.resources or app_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list | length == 0 %}
+                  {
+                    "priority": "HIGH",
+                    "category": "Deployment",
+                    "issue": "No running pods found",
+                    "recommendation": "Check deployment configuration, resource limits, and pod logs",
+                    "commands": [
+                      "kubectl describe deployment {{ app_name }} -n {{ target_namespace }}",
+                      "kubectl get events --sort-by=.metadata.creationTimestamp -n {{ target_namespace }}",
+                      "kubectl logs -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }}"
+                    ]
+                  },
+                  {% endif %}
+                  {% if deployment_status.resources and deployment_status.resources[0].status.readyReplicas | default(0) != deployment_status.resources[0].spec.replicas %}
+                  {
+                    "priority": "HIGH",  
+                    "category": "Scaling",
+                    "issue": "Replica count mismatch",
+                    "recommendation": "Investigate why pods are not reaching ready state",
+                    "commands": [
+                      "kubectl describe pods -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }}",
+                      "kubectl get pods -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }} -o wide"
+                    ]
+                  },
+                  {% endif %}
+                  {% if not app_services.resources %}
+                  {
+                    "priority": "MEDIUM",
+                    "category": "Networking",
+                    "issue": "No services found for application",
+                    "recommendation": "Create service to expose application",
+                    "commands": [
+                      "kubectl expose deployment {{ app_name }} --port=8080 --target-port=8080 -n {{ target_namespace }}"
+                    ]
+                  },
+                  {% endif %}
+                  {
+                    "priority": "LOW",
+                    "category": "Monitoring",
+                    "issue": "Continuous monitoring recommended",
+                    "recommendation": "Set up regular health checks and monitoring",
+                    "commands": [
+                      "kubectl top pods -n {{ target_namespace }}",
+                      "kubectl get events -w -n {{ target_namespace }}"
+                    ]
+                  }
+                ]
+              }
+            
+            troubleshooting-playbook.md: |
+              # IMS Application Troubleshooting Playbook
+              
+              Generated: {{ ansible_date_time.iso8601 }}
+              Environment: {{ workshop_environment | upper }}
+              Application: {{ app_name }}
+              Namespace: {{ target_namespace }}
+              
+              ## Quick Diagnostic Commands
+              
+              ### Check Application Status
+              ```bash
+              kubectl get all -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }}
+              kubectl describe deployment {{ app_name }} -n {{ target_namespace }}
+              kubectl get pods -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }} -o wide
+              ```
+              
+              ### Check Recent Events
+              ```bash
+              kubectl get events --sort-by=.metadata.creationTimestamp -n {{ target_namespace }}
+              kubectl get events --field-selector type=Warning -n {{ target_namespace }}
+              ```
+              
+              ### Application Logs
+              ```bash
+              kubectl logs -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }} --tail=100
+              kubectl logs -l app.kubernetes.io/name={{ app_name }} -n {{ target_namespace }} -f
+              ```
+              
+              ### Resource Usage
+              ```bash
+              kubectl top pods -n {{ target_namespace }}
+              kubectl describe resourcequota -n {{ target_namespace }}
+              ```
+              
+              ## Common Issues and Solutions
+              
+              {% for scenario in diagnostic_config.troubleshooting_scenarios %}
+              ### {{ scenario.scenario | replace('_', ' ') | title }}
+              
+              **Description:** {{ scenario.description }}
+              
+              **Diagnostic Checks:**
+              {% for check in scenario.checks %}
+              - {{ check | replace('_', ' ') | title }}
+              {% endfor %}
+              
+              **Remediation Steps:**
+              {% for step in scenario.remediation %}
+              1. {{ step | replace('_', ' ') | title }}
+              {% endfor %}
+              
+              {% endfor %}
+              
+              ## Performance Thresholds
+              
+              - CPU Usage: < {{ diagnostic_config.performance_metrics.cpu_threshold }}%
+              - Memory Usage: < {{ diagnostic_config.performance_metrics.memory_threshold }}%
+              - Response Time: < {{ diagnostic_config.performance_metrics.response_time_threshold }}ms
+              - Error Rate: < {{ diagnostic_config.performance_metrics.error_rate_threshold }}%
+              - Connection Pool: < {{ diagnostic_config.performance_metrics.connection_pool_utilization }}%
+              
+              ## Escalation Contacts
+              
+              - **Application Team:** IMS Development Team
+              - **Platform Team:** OpenShift Operations
+              - **Mainframe Team:** IMS System Administrators
+              - **Network Team:** Enterprise Networking
+      register: diagnostic_report_result
+
+    - name: "Generate final diagnostic summary"
+      ansible.builtin.debug:
+        msg: |
+          === IMS Advanced Troubleshooting Session Complete ===
+          
+          Diagnostic Results Summary:
+          =========================================
+          
+          🔍 SYSTEM HEALTH OVERVIEW:
+          - Namespace Access: {{ '✅ PASS' if namespace_connectivity.resources else '❌ FAIL' }}
+          - Application Pods: {{ '✅ PASS (' + (app_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list | length | string) + ' running)' if app_pods.resources and app_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list else '❌ FAIL (No running pods)' }}
+          - Deployment Status: {{ '✅ PASS' if deployment_status.resources and deployment_status.resources[0].status.readyReplicas | default(0) == deployment_status.resources[0].spec.replicas else '❌ FAIL' }}
+          - Service Discovery: {{ '✅ PASS' if app_services.resources else '⚠️ WARN (No services)' }}
+          - Configuration: {{ '✅ PASS (' + (configmap_status.resources | length | string) + ' configs)' if configmap_status.resources else '⚠️ WARN' }}
+          - Autoscaling: {{ '✅ CONFIGURED' if hpa_status.resources else 'ℹ️ NOT CONFIGURED' }}
+          
+          📊 RESOURCE ANALYSIS:
+          - Total Pods Found: {{ app_pods.resources | length }}
+          - Running Pods: {{ app_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list | length if app_pods.resources else 0 }}
+          - ConfigMaps: {{ configmap_status.resources | length }}
+          - Services: {{ app_services.resources | length }}
+          - Resource Quotas: {{ resource_quotas.resources | length if resource_quotas.resources else 0 }}
+          
+          🛠️ TROUBLESHOOTING TOOLS GENERATED:
+          - Diagnostic Report: {{ app_name }}-diagnostic-report ConfigMap
+          - Troubleshooting Playbook: Markdown guide with commands
+          - Health Check Scripts: Automated validation procedures
+          - Performance Monitoring: Metrics and thresholds
+          
+          📋 NEXT STEPS:
+          1. Review diagnostic report: kubectl get configmap {{ app_name }}-diagnostic-report -n {{ target_namespace }} -o yaml
+          2. Execute recommended commands from troubleshooting playbook
+          3. Monitor application performance using generated thresholds
+          4. Set up automated monitoring based on workshop patterns
+          
+          🎓 ADVANCED SKILLS DEMONSTRATED:
+          ✅ Systematic diagnostic approach using Ansible automation
+          ✅ Comprehensive health check implementation
+          ✅ Automated troubleshooting playbook generation
+          ✅ Performance monitoring and threshold management
+          ✅ Structured problem analysis and remediation
+          ✅ Production-ready operational procedures
+          
+          Environment: {{ workshop_environment | upper }}
+          Session Duration: Approximately {{ ((ansible_date_time.epoch | int) - (ansible_date_time.epoch | int)) | abs }}s
+          
+          === Module 3 Advanced Automation Workshop Complete ===
+
+    - name: "Export final workshop statistics"
+      ansible.builtin.set_stats:
+        data:
+          module3_diagnostics_namespace: "{{ target_namespace }}"
+          module3_diagnostics_completed: true
+          module3_health_checks_executed: "{{ diagnostic_config.health_checks | length }}"
+          module3_troubleshooting_scenarios: "{{ diagnostic_config.troubleshooting_scenarios | length }}"
+          module3_validation_rules: "{{ validation_rules.keys() | length }}"
+          module3_pods_found: "{{ app_pods.resources | length }}"
+          module3_running_pods: "{{ app_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list | length if app_pods.resources else 0 }}"
+          module3_services_found: "{{ app_services.resources | length }}"
+          module3_configmaps_found: "{{ configmap_status.resources | length }}"
+          module3_deployment_healthy: "{{ deployment_status.resources and deployment_status.resources[0].status.readyReplicas | default(0) == deployment_status.resources[0].spec.replicas }}"
+          module3_diagnostic_report_created: "{{ diagnostic_report_result.changed }}"

@@ -1,0 +1,81 @@
+---
+# Tasks for configuration management
+
+- name: "Create IMS connector ConfigMap with environment-specific settings"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: "{{ ims_deployment_app_name }}-config"
+        namespace: "{{ ims_deployment_namespace }}"
+        labels: "{{ ims_deployment_labels | combine({
+          'app.kubernetes.io/name': ims_deployment_app_name,
+          'app.kubernetes.io/version': ims_deployment_app_version,
+          'app.kubernetes.io/component': 'configuration'
+        }) }}"
+      data:
+        # IMS configuration properties
+        ims.properties: |
+          # IMS Database Configuration
+          ims.mainframe.host={{ ims_deployment_config.mainframe_host }}
+          ims.database.name={{ ims_deployment_config.database_name }}
+          ims.connection.pool.size={{ ims_deployment_config.connection_pool_size }}
+          ims.connection.timeout={{ ims_deployment_config.timeout_seconds }}
+          
+          # Environment-specific settings
+          environment={{ ims_deployment_environment }}
+          log.level={{ 'DEBUG' if ims_deployment_environment == 'dev' else 'INFO' }}
+          
+          # Performance tuning
+          connection.pool.min={{ (ims_deployment_config.connection_pool_size | int / 2) | int }}
+          connection.pool.max={{ ims_deployment_config.connection_pool_size }}
+          connection.validation.query=SELECT 1 FROM DUAL
+        
+        # Application configuration
+        application.yml: |
+          server:
+            port: 8080
+          spring:
+            application:
+              name: {{ ims_deployment_app_name }}
+            profiles:
+              active: {{ ims_deployment_environment }}
+          management:
+            endpoints:
+              web:
+                exposure:
+                  include: health,info,metrics
+            health:
+              show-details: always
+  register: ims_configmap_result
+
+- name: "Create IMS connector Secret for sensitive configuration"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ ims_deployment_app_name }}-secret"
+        namespace: "{{ ims_deployment_namespace }}"
+        labels: "{{ ims_deployment_labels | combine({
+          'app.kubernetes.io/name': ims_deployment_app_name,
+          'app.kubernetes.io/version': ims_deployment_app_version,
+          'app.kubernetes.io/component': 'secret'
+        }) }}"
+      type: Opaque
+      data:
+        # Base64 encoded sensitive values (in real scenarios, use vault)
+        ims-username: "{{ ('ims-user-' + ims_deployment_environment) | b64encode }}"
+        ims-password: "{{ ('changeme-' + ims_deployment_environment) | b64encode }}"
+        database-connection-string: "{{ ('jdbc:db2://' + ims_deployment_config.mainframe_host + ':50000/' + ims_deployment_config.database_name) | b64encode }}"
+  register: ims_secret_result
+
+- name: "Display configuration creation status"
+  ansible.builtin.debug:
+    msg: |
+      ConfigMap {{ ims_deployment_app_name }}-config: {{ 'Updated' if ims_configmap_result.changed else 'No changes' }}
+      Secret {{ ims_deployment_app_name }}-secret: {{ 'Updated' if ims_secret_result.changed else 'No changes' }}
+    verbosity: 1

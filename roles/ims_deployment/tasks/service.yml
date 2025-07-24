@@ -1,0 +1,39 @@
+---
+# Tasks for service management
+
+- name: "Create Service for IMS connector"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: "{{ ims_deployment_app_name }}-service"
+        namespace: "{{ ims_deployment_namespace }}"
+        labels: "{{ ims_deployment_labels | combine({
+          'app.kubernetes.io/name': ims_deployment_app_name,
+          'app.kubernetes.io/version': ims_deployment_app_version,
+          'app.kubernetes.io/component': 'service'
+        }) }}"
+        annotations: "{{ ims_deployment_annotations | combine({
+          'description': 'Service for IMS connector application'
+        }) }}"
+      spec:
+        type: "{{ ims_deployment_service.type }}"
+        ports:
+        - port: "{{ ims_deployment_service.port }}"
+          targetPort: "{{ ims_deployment_service.target_port }}"
+          protocol: "{{ ims_deployment_service.protocol }}"
+          name: http
+        selector:
+          app.kubernetes.io/name: "{{ ims_deployment_app_name }}"
+          app.kubernetes.io/component: "application"
+  register: ims_service_result
+
+- name: "Display service creation status"
+  ansible.builtin.debug:
+    msg: |
+      Service {{ ims_deployment_app_name }}-service: {{ 'Created' if ims_service_result.changed else 'Already exists' }}
+      Service type: {{ ims_deployment_service.type }}
+      Port: {{ ims_deployment_service.port }}
+    verbosity: 1

@@ -1,0 +1,611 @@
+---
+# Module 3, Exercise 1: Advanced Jinja2 Templating and Environment Configuration
+# Learning Focus: Complex templating patterns for IMS environment-specific deployments
+# Time: 15 minutes guided practice
+
+- name: "Exercise 3.1: Advanced IMS Environment Configuration with Complex Templating"
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars:
+    # Base workshop configuration
+    target_namespace: "{{ workshop_namespace | default('ims-advanced-' + ansible_date_time.epoch) }}"
+    app_name: "ims-transaction-processor"
+    app_version: "{{ ims_version | default('2.1.0') }}"
+    
+    # Multi-environment configuration matrix
+    environment_configs:
+      dev:
+        mainframe_endpoints:
+          primary: "dev-mainframe.example.com:9080"
+          secondary: "dev-mainframe-backup.example.com:9080"
+        database_configs:
+          - name: "IMSDB01"
+            type: "IMS_DB"
+            connection_pool: 5
+            timeout: 15
+            region: "IMSREG1"
+          - name: "IMSDB02"
+            type: "IMS_DB"
+            connection_pool: 3
+            timeout: 15
+            region: "IMSREG2"
+        transaction_types:
+          - code: "TXN001"
+            description: "Customer Inquiry"
+            timeout: 30
+            retry_count: 2
+          - code: "TXN002"
+            description: "Account Update"
+            timeout: 45
+            retry_count: 3
+        security_config:
+          encryption_level: "BASIC"
+          audit_level: "DETAILED"
+          session_timeout: 3600
+        resource_limits:
+          cpu_request: "200m"
+          cpu_limit: "1000m"
+          memory_request: "256Mi"
+          memory_limit: "1Gi"
+          storage_request: "1Gi"
+        scaling_config:
+          min_replicas: 1
+          max_replicas: 3
+          target_cpu_utilization: 70
+      
+      test:
+        mainframe_endpoints:
+          primary: "test-mainframe.example.com:9080"
+          secondary: "test-mainframe-backup.example.com:9080"
+        database_configs:
+          - name: "IMSDB01"
+            type: "IMS_DB"
+            connection_pool: 10
+            timeout: 20
+            region: "IMSREG1"
+          - name: "IMSDB02"
+            type: "IMS_DB"
+            connection_pool: 8
+            timeout: 20
+            region: "IMSREG2"
+          - name: "IMSDB03"
+            type: "IMS_DB"
+            connection_pool: 5
+            timeout: 20
+            region: "IMSREG3"
+        transaction_types:
+          - code: "TXN001"
+            description: "Customer Inquiry"
+            timeout: 25
+            retry_count: 3
+          - code: "TXN002"
+            description: "Account Update"
+            timeout: 40
+            retry_count: 4
+          - code: "TXN003"
+            description: "Batch Processing"
+            timeout: 120
+            retry_count: 2
+        security_config:
+          encryption_level: "ENHANCED"
+          audit_level: "COMPREHENSIVE"
+          session_timeout: 1800
+        resource_limits:
+          cpu_request: "500m"
+          cpu_limit: "2000m"
+          memory_request: "512Mi"
+          memory_limit: "2Gi"
+          storage_request: "5Gi"
+        scaling_config:
+          min_replicas: 2
+          max_replicas: 6
+          target_cpu_utilization: 60
+      
+      prod:
+        mainframe_endpoints:
+          primary: "prod-mainframe.example.com:9080"
+          secondary: "prod-mainframe-backup.example.com:9080"
+          tertiary: "prod-mainframe-dr.example.com:9080"
+        database_configs:
+          - name: "IMSDB01"
+            type: "IMS_DB"
+            connection_pool: 20
+            timeout: 30
+            region: "IMSREG1"
+          - name: "IMSDB02"
+            type: "IMS_DB"
+            connection_pool: 15
+            timeout: 30
+            region: "IMSREG2"
+          - name: "IMSDB03"
+            type: "IMS_DB"
+            connection_pool: 12
+            timeout: 30
+            region: "IMSREG3"
+          - name: "IMSDB04"
+            type: "IMS_DB"
+            connection_pool: 10
+            timeout: 30
+            region: "IMSREG4"
+        transaction_types:
+          - code: "TXN001"
+            description: "Customer Inquiry"
+            timeout: 20
+            retry_count: 5
+          - code: "TXN002"
+            description: "Account Update"
+            timeout: 35
+            retry_count: 5
+          - code: "TXN003"
+            description: "Batch Processing"
+            timeout: 180
+            retry_count: 3
+          - code: "TXN004"
+            description: "Real-time Sync"
+            timeout: 10
+            retry_count: 10
+        security_config:
+          encryption_level: "MAXIMUM"
+          audit_level: "FORENSIC"
+          session_timeout: 900
+        resource_limits:
+          cpu_request: "1000m"
+          cpu_limit: "4000m"
+          memory_request: "1Gi"
+          memory_limit: "4Gi"
+          storage_request: "20Gi"
+        scaling_config:
+          min_replicas: 3
+          max_replicas: 12
+          target_cpu_utilization: 50
+
+    # Current environment configuration (derived from environment_configs)
+    current_config: "{{ environment_configs[workshop_environment] }}"
+    
+    # Advanced computed values using complex Jinja2 expressions
+    computed_values:
+      total_connection_pools: "{{ current_config.database_configs | sum(attribute='connection_pool') }}"
+      max_transaction_timeout: "{{ current_config.transaction_types | max(attribute='timeout') }}"
+      database_regions: "{{ current_config.database_configs | map(attribute='region') | unique | list }}"
+      endpoint_count: "{{ current_config.mainframe_endpoints | length }}"
+      high_priority_transactions: "{{ current_config.transaction_types | selectattr('timeout', 'lessthan', 60) | list }}"
+      batch_transactions: "{{ current_config.transaction_types | selectattr('timeout', 'greaterthan', 100) | list }}"
+
+  tasks:
+    - name: "Validate workshop environment is specified"
+      ansible.builtin.assert:
+        that:
+          - workshop_environment is defined
+          - workshop_environment in ['dev', 'test', 'prod']
+        fail_msg: "workshop_environment must be defined and set to dev, test, or prod"
+        quiet: true
+
+    - name: "Display advanced templating examples"
+      ansible.builtin.debug:
+        msg: |
+          === Advanced Jinja2 Templating Demonstration ===
+          Environment: {{ workshop_environment | upper }}
+          
+          Computed Values:
+          - Total Connection Pools: {{ computed_values.total_connection_pools }}
+          - Maximum Transaction Timeout: {{ computed_values.max_transaction_timeout }}s
+          - Database Regions: {{ computed_values.database_regions | join(', ') }}
+          - Mainframe Endpoints: {{ computed_values.endpoint_count }}
+          - High Priority Transactions: {{ computed_values.high_priority_transactions | length }}
+          - Batch Transactions: {{ computed_values.batch_transactions | length }}
+          
+          Primary Mainframe: {{ current_config.mainframe_endpoints.primary }}
+          Security Level: {{ current_config.security_config.encryption_level }}
+          Scaling Range: {{ current_config.scaling_config.min_replicas }}-{{ current_config.scaling_config.max_replicas }} replicas
+
+    - name: "Create namespace with advanced labels"
+      kubernetes.core.k8s:
+        name: "{{ target_namespace }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+        definition:
+          metadata:
+            labels:
+              workshop.redhat.com/module: "module3"
+              workshop.redhat.com/environment: "{{ workshop_environment }}"
+              workshop.redhat.com/complexity: "advanced"
+              ims.mainframe.com/region-count: "{{ computed_values.database_regions | length | string }}"
+              ims.mainframe.com/endpoint-count: "{{ computed_values.endpoint_count | string }}"
+              app.kubernetes.io/managed-by: "ansible"
+              app.kubernetes.io/part-of: "ims-workshop"
+            annotations:
+              workshop.redhat.com/created-by: "{{ ansible_user | default('workshop-user') }}"
+              workshop.redhat.com/template-complexity: "advanced-jinja2"
+              ims.mainframe.com/total-pools: "{{ computed_values.total_connection_pools | string }}"
+              ims.mainframe.com/max-timeout: "{{ computed_values.max_transaction_timeout | string }}"
+
+    - name: "Generate complex IMS configuration using advanced templating"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: "{{ app_name }}-advanced-config"
+            namespace: "{{ target_namespace }}"
+            labels:
+              app.kubernetes.io/name: "{{ app_name }}"
+              app.kubernetes.io/component: "configuration"
+              ims.mainframe.com/config-complexity: "advanced"
+          data:
+            # Complex IMS properties with conditional logic
+            ims-advanced.properties: |
+              # Generated configuration for {{ workshop_environment | upper }} environment
+              # Template complexity: Advanced Jinja2 with conditionals and filters
+              
+              # Mainframe Endpoint Configuration
+              {% for endpoint_name, endpoint_url in current_config.mainframe_endpoints.items() %}
+              ims.endpoint.{{ endpoint_name }}={{ endpoint_url }}
+              {% endfor %}
+              ims.endpoint.primary={{ current_config.mainframe_endpoints.primary }}
+              ims.endpoint.failover.enabled={{ 'true' if current_config.mainframe_endpoints | length > 1 else 'false' }}
+              
+              # Database Connection Configuration
+              {% for db in current_config.database_configs %}
+              # Database: {{ db.name }} (Region: {{ db.region }})
+              ims.database.{{ db.name | lower }}.pool.size={{ db.connection_pool }}
+              ims.database.{{ db.name | lower }}.timeout={{ db.timeout }}
+              ims.database.{{ db.name | lower }}.region={{ db.region }}
+              ims.database.{{ db.name | lower }}.type={{ db.type }}
+              {% if db.connection_pool >= 15 %}
+              ims.database.{{ db.name | lower }}.pool.validation.enabled=true
+              ims.database.{{ db.name | lower }}.pool.validation.query=SELECT 1 FROM SYSIBM.SYSDUMMY1
+              {% endif %}
+              {% endfor %}
+              
+              # Transaction Type Configuration
+              {% for txn in current_config.transaction_types %}
+              # Transaction: {{ txn.code }} - {{ txn.description }}
+              ims.transaction.{{ txn.code | lower }}.timeout={{ txn.timeout }}
+              ims.transaction.{{ txn.code | lower }}.retry.count={{ txn.retry_count }}
+              ims.transaction.{{ txn.code | lower }}.description={{ txn.description }}
+              {% if txn.timeout > 100 %}
+              ims.transaction.{{ txn.code | lower }}.type=BATCH
+              ims.transaction.{{ txn.code | lower }}.priority=LOW
+              {% elif txn.timeout < 30 %}
+              ims.transaction.{{ txn.code | lower }}.type=REALTIME
+              ims.transaction.{{ txn.code | lower }}.priority=HIGH
+              {% else %}
+              ims.transaction.{{ txn.code | lower }}.type=INTERACTIVE
+              ims.transaction.{{ txn.code | lower }}.priority=MEDIUM
+              {% endif %}
+              {% endfor %}
+              
+              # Security Configuration
+              ims.security.encryption.level={{ current_config.security_config.encryption_level }}
+              ims.security.audit.level={{ current_config.security_config.audit_level }}
+              ims.security.session.timeout={{ current_config.security_config.session_timeout }}
+              {% if current_config.security_config.encryption_level == 'MAXIMUM' %}
+              ims.security.tls.version=TLSv1.3
+              ims.security.cipher.suites=TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256
+              {% elif current_config.security_config.encryption_level == 'ENHANCED' %}
+              ims.security.tls.version=TLSv1.2
+              ims.security.cipher.suites=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+              {% else %}
+              ims.security.tls.version=TLSv1.2
+              ims.security.cipher.suites=TLS_RSA_WITH_AES_128_GCM_SHA256
+              {% endif %}
+              
+              # Environment-specific Performance Tuning
+              {% if workshop_environment == 'prod' %}
+              ims.performance.connection.pool.prefill=true
+              ims.performance.statement.cache.size=1000
+              ims.performance.result.cache.enabled=true
+              ims.performance.monitoring.enabled=true
+              {% elif workshop_environment == 'test' %}
+              ims.performance.connection.pool.prefill=false
+              ims.performance.statement.cache.size=500
+              ims.performance.result.cache.enabled=true
+              ims.performance.monitoring.enabled=true
+              {% else %}
+              ims.performance.connection.pool.prefill=false
+              ims.performance.statement.cache.size=100
+              ims.performance.result.cache.enabled=false
+              ims.performance.monitoring.enabled=false
+              {% endif %}
+              
+              # Computed Configuration Values
+              ims.computed.total.pools={{ computed_values.total_connection_pools }}
+              ims.computed.max.timeout={{ computed_values.max_transaction_timeout }}
+              ims.computed.regions={{ computed_values.database_regions | join(',') }}
+              ims.computed.high.priority.transactions={{ computed_values.high_priority_transactions | length }}
+              ims.computed.batch.transactions={{ computed_values.batch_transactions | length }}
+            
+            # Advanced logging configuration with conditional formatting
+            logback-spring.xml: |
+              <?xml version="1.0" encoding="UTF-8"?>
+              <configuration>
+                  <!-- Environment: {{ workshop_environment | upper }} -->
+                  <!-- Configuration generated with advanced Jinja2 templating -->
+                  
+                  <!-- Console Appender with conditional formatting -->
+                  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+                      <encoder>
+                          {% if workshop_environment == 'dev' %}
+                          <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+                          {% else %}
+                          <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{transactionId}] %logger{50} - %msg%n</pattern>
+                          {% endif %}
+                      </encoder>
+                  </appender>
+                  
+                  <!-- File Appender for different environments -->
+                  {% if workshop_environment in ['test', 'prod'] %}
+                  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                      <file>/app/logs/{{ app_name }}.log</file>
+                      <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                          <fileNamePattern>/app/logs/{{ app_name }}.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+                          <maxFileSize>{{ '500MB' if workshop_environment == 'prod' else '100MB' }}</maxFileSize>
+                          <maxHistory>{{ 30 if workshop_environment == 'prod' else 7 }}</maxHistory>
+                          <totalSizeCap>{{ '10GB' if workshop_environment == 'prod' else '1GB' }}</totalSizeCap>
+                      </rollingPolicy>
+                      <encoder>
+                          <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{transactionId}] [%X{userId}] %logger{50} - %msg%n</pattern>
+                      </encoder>
+                  </appender>
+                  {% endif %}
+                  
+                  <!-- Logger configuration based on environment -->
+                  {% for txn in current_config.transaction_types %}
+                  <logger name="com.ims.transaction.{{ txn.code | lower }}" level="{{ 'DEBUG' if workshop_environment == 'dev' else 'INFO' }}" />
+                  {% endfor %}
+                  
+                  {% for db in current_config.database_configs %}
+                  <logger name="com.ims.database.{{ db.name | lower }}" level="{{ 'DEBUG' if workshop_environment == 'dev' else 'WARN' }}" />
+                  {% endfor %}
+                  
+                  <!-- Root logger configuration -->
+                  <root level="{{ 'DEBUG' if workshop_environment == 'dev' else 'INFO' if workshop_environment == 'test' else 'WARN' }}">
+                      <appender-ref ref="CONSOLE" />
+                      {% if workshop_environment in ['test', 'prod'] %}
+                      <appender-ref ref="FILE" />
+                      {% endif %}
+                  </root>
+              </configuration>
+            
+            # Environment-specific application properties
+            application-{{ workshop_environment }}.yml: |
+              # Advanced {{ app_name }} configuration for {{ workshop_environment | upper }}
+              # Generated using complex Jinja2 templating patterns
+              
+              server:
+                port: 8080
+                tomcat:
+                  max-threads: {{ current_config.scaling_config.max_replicas * 50 }}
+                  min-spare-threads: {{ current_config.scaling_config.min_replicas * 10 }}
+              
+              spring:
+                application:
+                  name: {{ app_name }}
+                profiles:
+                  active: {{ workshop_environment }}
+                datasource:
+                  {% set primary_db = current_config.database_configs[0] %}
+                  url: jdbc:db2://{{ current_config.mainframe_endpoints.primary.split(':')[0] }}:50000/{{ primary_db.name }}
+                  username: ${IMS_USERNAME}
+                  password: ${IMS_PASSWORD}
+                  hikari:
+                    maximum-pool-size: {{ primary_db.connection_pool }}
+                    minimum-idle: {{ (primary_db.connection_pool / 2) | int }}
+                    connection-timeout: {{ primary_db.timeout * 1000 }}
+                    idle-timeout: {{ primary_db.timeout * 2000 }}
+                    max-lifetime: {{ primary_db.timeout * 10000 }}
+              
+              # IMS-specific configuration
+              ims:
+                transaction:
+                  {% for txn in current_config.transaction_types %}
+                  {{ txn.code | lower }}:
+                    timeout: {{ txn.timeout }}
+                    retries: {{ txn.retry_count }}
+                    {% if txn.timeout > 100 %}
+                    async: true
+                    queue: batch-queue
+                    {% else %}
+                    async: false
+                    queue: realtime-queue
+                    {% endif %}
+                  {% endfor %}
+                
+                database:
+                  regions:
+                  {% for region in computed_values.database_regions %}
+                    - name: {{ region }}
+                      databases:
+                      {% for db in current_config.database_configs %}
+                      {% if db.region == region %}
+                        - {{ db.name }}
+                      {% endif %}
+                      {% endfor %}
+                  {% endfor %}
+                
+                security:
+                  encryption: {{ current_config.security_config.encryption_level | lower }}
+                  audit: {{ current_config.security_config.audit_level | lower }}
+                  session-timeout: {{ current_config.security_config.session_timeout }}
+              
+              # Monitoring and observability
+              management:
+                endpoints:
+                  web:
+                    exposure:
+                      include: >-
+                        health,info,metrics,prometheus
+                        {%- if workshop_environment == 'dev' -%}
+                        ,beans,configprops,env
+                        {%- endif %}
+                health:
+                  show-details: {{ 'always' if workshop_environment == 'dev' else 'when-authorized' }}
+                metrics:
+                  tags:
+                    environment: {{ workshop_environment }}
+                    application: {{ app_name }}
+                    region: {{ computed_values.database_regions | join('-') }}
+      register: advanced_configmap_result
+
+    - name: "Create deployment with advanced resource calculation"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: "{{ app_name }}"
+            namespace: "{{ target_namespace }}"
+            labels:
+              app.kubernetes.io/name: "{{ app_name }}"
+              app.kubernetes.io/version: "{{ app_version }}"
+              app.kubernetes.io/component: "application"
+              ims.mainframe.com/template-level: "advanced"
+            annotations:
+              # Advanced annotations with computed values
+              ims.mainframe.com/total-pools: "{{ computed_values.total_connection_pools | string }}"
+              ims.mainframe.com/regions: "{{ computed_values.database_regions | join(',') }}"
+              ims.mainframe.com/endpoints: "{{ computed_values.endpoint_count | string }}"
+              ims.mainframe.com/config-checksum: "{{ (current_config | to_json | hash('sha256'))[:16] }}"
+          spec:
+            replicas: "{{ current_config.scaling_config.min_replicas }}"
+            selector:
+              matchLabels:
+                app.kubernetes.io/name: "{{ app_name }}"
+            template:
+              metadata:
+                labels:
+                  app.kubernetes.io/name: "{{ app_name }}"
+                  app.kubernetes.io/version: "{{ app_version }}"
+                  ims.mainframe.com/environment: "{{ workshop_environment }}"
+                annotations:
+                  # Template checksum for config change detection
+                  config.checksum: "{{ (current_config | to_json | hash('sha256')) }}"
+              spec:
+                containers:
+                - name: "{{ app_name }}"
+                  image: "registry.redhat.io/ubi8/openjdk-11:latest"
+                  env:
+                  # Dynamic environment variables based on configuration
+                  {% for db in current_config.database_configs %}
+                  - name: "IMS_DB_{{ db.name }}_POOL_SIZE"
+                    value: "{{ db.connection_pool | string }}"
+                  - name: "IMS_DB_{{ db.name }}_TIMEOUT"
+                    value: "{{ db.timeout | string }}"
+                  - name: "IMS_DB_{{ db.name }}_REGION"
+                    value: "{{ db.region }}"
+                  {% endfor %}
+                  {% for txn in current_config.transaction_types %}
+                  - name: "IMS_TXN_{{ txn.code }}_TIMEOUT"
+                    value: "{{ txn.timeout | string }}"
+                  - name: "IMS_TXN_{{ txn.code }}_RETRIES"
+                    value: "{{ txn.retry_count | string }}"
+                  {% endfor %}
+                  - name: "IMS_ENVIRONMENT"
+                    value: "{{ workshop_environment }}"
+                  - name: "IMS_TOTAL_POOLS"
+                    value: "{{ computed_values.total_connection_pools | string }}"
+                  - name: "IMS_MAX_TIMEOUT"
+                    value: "{{ computed_values.max_transaction_timeout | string }}"
+                  - name: "SPRING_PROFILES_ACTIVE"
+                    value: "{{ workshop_environment }}"
+                  resources:
+                    requests:
+                      cpu: "{{ current_config.resource_limits.cpu_request }}"
+                      memory: "{{ current_config.resource_limits.memory_request }}"
+                    limits:
+                      cpu: "{{ current_config.resource_limits.cpu_limit }}"
+                      memory: "{{ current_config.resource_limits.memory_limit }}"
+                  volumeMounts:
+                  - name: advanced-config
+                    mountPath: /app/config
+                    readOnly: true
+                volumes:
+                - name: advanced-config
+                  configMap:
+                    name: "{{ app_name }}-advanced-config"
+      register: advanced_deployment_result
+
+    - name: "Create HorizontalPodAutoscaler with computed values"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: autoscaling/v2
+          kind: HorizontalPodAutoscaler
+          metadata:
+            name: "{{ app_name }}-hpa"
+            namespace: "{{ target_namespace }}"
+            labels:
+              app.kubernetes.io/name: "{{ app_name }}"
+              app.kubernetes.io/component: "autoscaler"
+          spec:
+            scaleTargetRef:
+              apiVersion: apps/v1
+              kind: Deployment
+              name: "{{ app_name }}"
+            minReplicas: "{{ current_config.scaling_config.min_replicas }}"
+            maxReplicas: "{{ current_config.scaling_config.max_replicas }}"
+            metrics:
+            - type: Resource
+              resource:
+                name: cpu
+                target:
+                  type: Utilization
+                  averageUtilization: "{{ current_config.scaling_config.target_cpu_utilization }}"
+            {% if workshop_environment == 'prod' %}
+            - type: Resource
+              resource:
+                name: memory
+                target:
+                  type: Utilization
+                  averageUtilization: 80
+            {% endif %}
+      register: hpa_result
+
+    - name: "Display advanced templating results and analysis"
+      ansible.builtin.debug:
+        msg: |
+          === Advanced Jinja2 Templating Results ===
+          
+          Configuration Analysis:
+          - Environment: {{ workshop_environment | upper }}
+          - Template Complexity: Advanced with conditionals, filters, and loops
+          - Configuration Checksum: {{ (current_config | to_json | hash('sha256'))[:16] }}
+          
+          Generated Resources:
+          - ConfigMap: {{ 'Created' if advanced_configmap_result.changed else 'No changes' }}
+          - Deployment: {{ 'Created' if advanced_deployment_result.changed else 'No changes' }}  
+          - HPA: {{ 'Created' if hpa_result.changed else 'No changes' }}
+          
+          Advanced Template Features Demonstrated:
+          1. Complex nested data structures ({{ current_config.database_configs | length }} databases, {{ current_config.transaction_types | length }} transaction types)
+          2. Conditional logic based on environment ({{ workshop_environment }})
+          3. Dynamic loops with filtering ({% raw %}{{ current_config.database_configs | selectattr('connection_pool', 'greaterthan', 10) | list | length }}{% endraw %} high-capacity pools)
+          4. Mathematical operations (Total pools: {{ computed_values.total_connection_pools }})
+          5. String manipulation and formatting
+          6. Hash generation for change detection
+          7. Complex nested conditionals in templates
+          
+          Performance Calculations:
+          - Scaling range: {{ current_config.scaling_config.min_replicas }}-{{ current_config.scaling_config.max_replicas }} replicas
+          - CPU utilization target: {{ current_config.scaling_config.target_cpu_utilization }}%
+          - Total connection capacity: {{ computed_values.total_connection_pools }} connections
+          - Maximum transaction timeout: {{ computed_values.max_transaction_timeout }}s
+          
+          Next Exercise: Comprehensive error handling and retry mechanisms
+
+    - name: "Export advanced configuration for next exercise"
+      ansible.builtin.set_stats:
+        data:
+          module3_namespace: "{{ target_namespace }}"
+          module3_app_name: "{{ app_name }}"
+          module3_environment: "{{ workshop_environment }}"
+          module3_config_checksum: "{{ (current_config | to_json | hash('sha256'))[:16] }}"
+          module3_total_pools: "{{ computed_values.total_connection_pools }}"
+          module3_max_timeout: "{{ computed_values.max_transaction_timeout }}"
+          module3_database_regions: "{{ computed_values.database_regions }}"
+          module3_scaling_min: "{{ current_config.scaling_config.min_replicas }}"
+          module3_scaling_max: "{{ current_config.scaling_config.max_replicas }}"

@@ -1,0 +1,346 @@
+---
+# Module 2, Exercise 1: Idempotent IMS Resource Deployment
+# Learning Focus: Production-ready deployment patterns using redhat.openshift collection
+# Time: 15 minutes guided practice
+
+- name: "Exercise 2.1: Deploy IMS Connector Service with Idempotent Patterns"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    # Workshop environment configuration
+    target_namespace: "{{ workshop_namespace | default('ims-workshop-' + ansible_date_time.epoch) }}"
+    service_account_name: "ims-connector-sa"
+    app_name: "ims-connector"
+    app_version: "{{ ims_version | default('1.0.0') }}"
+    
+    # IMS-specific configuration
+    ims_config:
+      mainframe_host: "{{ ims_mainframe_host | default('mainframe.example.com') }}"
+      connection_pool_size: "{{ ims_pool_size | default(10) }}"
+      timeout_seconds: "{{ ims_timeout | default(30) }}"
+      database_name: "{{ ims_database | default('IMSDB01') }}"
+    
+    # Resource specifications for different environments
+    resource_specs:
+      dev:
+        replicas: 1
+        cpu_request: "100m"
+        cpu_limit: "500m"
+        memory_request: "128Mi"
+        memory_limit: "512Mi"
+      test:
+        replicas: 2
+        cpu_request: "200m"
+        cpu_limit: "1000m"
+        memory_request: "256Mi"
+        memory_limit: "1Gi"
+      prod:
+        replicas: 3
+        cpu_request: "500m"
+        cpu_limit: "2000m"
+        memory_request: "512Mi"
+        memory_limit: "2Gi"
+
+  tasks:
+    - name: "Validate required variables are defined"
+      ansible.builtin.assert:
+        that:
+          - workshop_environment is defined
+          - workshop_environment in ['dev', 'test', 'prod']
+          - ims_mainframe_host is defined
+        fail_msg: "Required variables missing. Set workshop_environment and ims_mainframe_host"
+        quiet: true
+
+    - name: "Create namespace with proper labels and annotations"
+      kubernetes.core.k8s:
+        name: "{{ target_namespace }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+        definition:
+          metadata:
+            labels:
+              workshop.redhat.com/module: "module2"
+              workshop.redhat.com/environment: "{{ workshop_environment }}"
+              app.kubernetes.io/managed-by: "ansible"
+              app.kubernetes.io/part-of: "ims-workshop"
+            annotations:
+              workshop.redhat.com/created-by: "{{ ansible_user | default('workshop-user') }}"
+              description: "IMS Workshop Module 2 - Idempotent Resource Management"
+      register: namespace_result
+
+    - name: "Display namespace creation status"
+      ansible.builtin.debug:
+        msg: |
+          Namespace Status: {{ 'Created' if namespace_result.changed else 'Already exists' }}
+          Namespace: {{ target_namespace }}
+          Environment: {{ workshop_environment }}
+
+    - name: "Create service account with proper metadata"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: "{{ service_account_name }}"
+            namespace: "{{ target_namespace }}"
+            labels:
+              app.kubernetes.io/name: "{{ app_name }}"
+              app.kubernetes.io/version: "{{ app_version }}"
+              app.kubernetes.io/component: "service-account"
+              app.kubernetes.io/managed-by: "ansible"
+            annotations:
+              description: "Service account for IMS connector with mainframe access"
+      register: serviceaccount_result
+
+    - name: "Create IMS connector ConfigMap with environment-specific settings"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: "{{ app_name }}-config"
+            namespace: "{{ target_namespace }}"
+            labels:
+              app.kubernetes.io/name: "{{ app_name }}"
+              app.kubernetes.io/version: "{{ app_version }}"
+              app.kubernetes.io/component: "configuration"
+          data:
+            # IMS configuration properties
+            ims.properties: |
+              # IMS Database Configuration
+              ims.mainframe.host={{ ims_config.mainframe_host }}
+              ims.database.name={{ ims_config.database_name }}
+              ims.connection.pool.size={{ ims_config.connection_pool_size }}
+              ims.connection.timeout={{ ims_config.timeout_seconds }}
+              
+              # Environment-specific settings
+              environment={{ workshop_environment }}
+              log.level={{ 'DEBUG' if workshop_environment == 'dev' else 'INFO' }}
+              
+              # Performance tuning
+              connection.pool.min={{ (ims_config.connection_pool_size | int / 2) | int }}
+              connection.pool.max={{ ims_config.connection_pool_size }}
+              connection.validation.query=SELECT 1 FROM DUAL
+            
+            # Application configuration
+            application.yml: |
+              server:
+                port: 8080
+              spring:
+                application:
+                  name: {{ app_name }}
+                profiles:
+                  active: {{ workshop_environment }}
+              management:
+                endpoints:
+                  web:
+                    exposure:
+                      include: health,info,metrics
+                health:
+                  show-details: always
+      register: configmap_result
+
+    - name: "Create IMS connector Secret for sensitive configuration"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: "{{ app_name }}-secret"
+            namespace: "{{ target_namespace }}"
+            labels:
+              app.kubernetes.io/name: "{{ app_name }}"
+              app.kubernetes.io/version: "{{ app_version }}"
+              app.kubernetes.io/component: "secret"
+          type: Opaque
+          data:
+            # Base64 encoded sensitive values (in real scenarios, use vault)
+            ims-username: "{{ ('ims-user-' + workshop_environment) | b64encode }}"
+            ims-password: "{{ ('changeme-' + workshop_environment) | b64encode }}"
+            database-connection-string: "{{ ('jdbc:db2://' + ims_config.mainframe_host + ':50000/' + ims_config.database_name) | b64encode }}"
+      register: secret_result
+
+    - name: "Deploy IMS connector Deployment with idempotent configuration"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: "{{ app_name }}"
+            namespace: "{{ target_namespace }}"
+            labels:
+              app.kubernetes.io/name: "{{ app_name }}"
+              app.kubernetes.io/version: "{{ app_version }}"
+              app.kubernetes.io/component: "application"
+              app.kubernetes.io/managed-by: "ansible"
+            annotations:
+              deployment.kubernetes.io/revision: "1"
+              description: "IMS connector service for mainframe integration"
+          spec:
+            replicas: "{{ resource_specs[workshop_environment].replicas }}"
+            selector:
+              matchLabels:
+                app.kubernetes.io/name: "{{ app_name }}"
+                app.kubernetes.io/component: "application"
+            template:
+              metadata:
+                labels:
+                  app.kubernetes.io/name: "{{ app_name }}"
+                  app.kubernetes.io/version: "{{ app_version }}"
+                  app.kubernetes.io/component: "application"
+                annotations:
+                  prometheus.io/scrape: "true"
+                  prometheus.io/port: "8080"
+                  prometheus.io/path: "/actuator/prometheus"
+              spec:
+                serviceAccountName: "{{ service_account_name }}"
+                securityContext:
+                  runAsNonRoot: true
+                  runAsUser: 1001
+                  fsGroup: 1001
+                containers:
+                - name: "{{ app_name }}"
+                  image: "registry.redhat.io/ubi8/openjdk-11:latest"
+                  imagePullPolicy: Always
+                  ports:
+                  - containerPort: 8080
+                    name: http
+                    protocol: TCP
+                  env:
+                  - name: JAVA_OPTS
+                    value: "-Xms{{ resource_specs[workshop_environment].memory_request }} -Xmx{{ resource_specs[workshop_environment].memory_limit }}"
+                  - name: SPRING_CONFIG_LOCATION
+                    value: "classpath:/application.yml,/app/config/application.yml"
+                  envFrom:
+                  - configMapRef:
+                      name: "{{ app_name }}-config"
+                  - secretRef:
+                      name: "{{ app_name }}-secret"
+                  resources:
+                    requests:
+                      cpu: "{{ resource_specs[workshop_environment].cpu_request }}"
+                      memory: "{{ resource_specs[workshop_environment].memory_request }}"
+                    limits:
+                      cpu: "{{ resource_specs[workshop_environment].cpu_limit }}"
+                      memory: "{{ resource_specs[workshop_environment].memory_limit }}"
+                  volumeMounts:
+                  - name: config-volume
+                    mountPath: /app/config
+                    readOnly: true
+                  - name: secret-volume
+                    mountPath: /app/secrets
+                    readOnly: true
+                  livenessProbe:
+                    httpGet:
+                      path: /actuator/health
+                      port: 8080
+                    initialDelaySeconds: 60
+                    periodSeconds: 30
+                    timeoutSeconds: 10
+                    failureThreshold: 3
+                  readinessProbe:
+                    httpGet:
+                      path: /actuator/health/readiness
+                      port: 8080
+                    initialDelaySeconds: 30
+                    periodSeconds: 10
+                    timeoutSeconds: 5
+                    failureThreshold: 3
+                volumes:
+                - name: config-volume
+                  configMap:
+                    name: "{{ app_name }}-config"
+                - name: secret-volume
+                  secret:
+                    secretName: "{{ app_name }}-secret"
+                    defaultMode: 0400
+      register: deployment_result
+
+    - name: "Create Service for IMS connector"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: "{{ app_name }}-service"
+            namespace: "{{ target_namespace }}"
+            labels:
+              app.kubernetes.io/name: "{{ app_name }}"
+              app.kubernetes.io/version: "{{ app_version }}"
+              app.kubernetes.io/component: "service"
+            annotations:
+              description: "Service for IMS connector application"
+          spec:
+            type: ClusterIP
+            ports:
+            - port: 8080
+              targetPort: http
+              protocol: TCP
+              name: http
+            selector:
+              app.kubernetes.io/name: "{{ app_name }}"
+              app.kubernetes.io/component: "application"
+      register: service_result
+
+    - name: "Wait for deployment to be ready"
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ app_name }}"
+        namespace: "{{ target_namespace }}"
+        wait: true
+        wait_condition:
+          type: Available
+          status: "True"
+        wait_timeout: 300
+      register: deployment_status
+
+    - name: "Verify deployment idempotency"
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ app_name }}"
+        namespace: "{{ target_namespace }}"
+      register: final_deployment_state
+
+    - name: "Display deployment summary"
+      ansible.builtin.debug:
+        msg: |
+          === IMS Connector Deployment Summary ===
+          Namespace: {{ target_namespace }}
+          Environment: {{ workshop_environment }}
+          Application: {{ app_name }} v{{ app_version }}
+          Replicas: {{ resource_specs[workshop_environment].replicas }}
+          Resource Limits: {{ resource_specs[workshop_environment].cpu_limit }} CPU, {{ resource_specs[workshop_environment].memory_limit }} Memory
+          
+          Deployment Status: {{ 'Ready' if deployment_status.resources[0].status.readyReplicas == resource_specs[workshop_environment].replicas else 'Not Ready' }}
+          Ready Replicas: {{ deployment_status.resources[0].status.readyReplicas | default(0) }}/{{ resource_specs[workshop_environment].replicas }}
+          
+          Resources Created:
+          - Namespace: {{ 'Created' if namespace_result.changed else 'Already exists' }}
+          - ServiceAccount: {{ 'Created' if serviceaccount_result.changed else 'Already exists' }}
+          - ConfigMap: {{ 'Updated' if configmap_result.changed else 'No changes' }}
+          - Secret: {{ 'Updated' if secret_result.changed else 'No changes' }}
+          - Deployment: {{ 'Updated' if deployment_result.changed else 'No changes' }}
+          - Service: {{ 'Created' if service_result.changed else 'Already exists' }}
+
+    - name: "Export connection information for next exercise"
+      ansible.builtin.set_stats:
+        data:
+          module2_namespace: "{{ target_namespace }}"
+          module2_service_name: "{{ app_name }}-service"
+          module2_app_name: "{{ app_name }}"
+          module2_environment: "{{ workshop_environment }}"
+          module2_deployment_ready: "{{ deployment_status.resources[0].status.readyReplicas == resource_specs[workshop_environment].replicas }}"
+
+  handlers:
+    - name: "Log deployment completion"
+      ansible.builtin.debug:
+        msg: "IMS connector deployment completed successfully in {{ target_namespace }}"

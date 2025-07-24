@@ -1,0 +1,338 @@
+---
+# Module 2, Exercise 2: Automated RBAC and Service Account Management
+# Learning Focus: Production security patterns with comprehensive RBAC
+# Time: 10 minutes guided practice
+
+- name: "Exercise 2.2: Automated Service Account Provisioning with RBAC"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    # RBAC configuration for different environments
+    rbac_profiles:
+      dev:
+        cluster_roles:
+          - view
+        namespace_roles:
+          - edit
+        custom_permissions:
+          - pods/log
+          - pods/exec
+      test: 
+        cluster_roles:
+          - view
+        namespace_roles:
+          - view
+        custom_permissions:
+          - pods/log
+      prod:
+        cluster_roles: []
+        namespace_roles:
+          - view
+        custom_permissions:
+          - pods/log
+
+    # Service accounts to create
+    service_accounts:
+      - name: "ims-reader"
+        description: "Read-only access for IMS monitoring services"
+        role_type: "reader"
+      - name: "ims-operator"
+        description: "Operational access for IMS maintenance tasks"
+        role_type: "operator"
+      - name: "ims-admin"
+        description: "Administrative access for IMS deployment management"
+        role_type: "admin"
+        environments: ["dev"]  # Only create in dev environment
+
+  tasks:
+    - name: "Validate RBAC prerequisites"
+      ansible.builtin.assert:
+        that:
+          - workshop_environment is defined
+          - workshop_environment in ['dev', 'test', 'prod']
+          - module2_namespace is defined
+        fail_msg: "Required variables missing. Run exercise 2-1 first or set workshop_environment and module2_namespace"
+        quiet: true
+
+    - name: "Create custom ClusterRole for IMS operations"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRole
+          metadata:
+            name: "ims-cluster-operations"
+            labels:
+              workshop.redhat.com/module: "module2"
+              rbac.authorization.k8s.io/aggregate-to-view: "true"
+            annotations:
+              description: "Custom cluster role for IMS-specific operations"
+          rules:
+          # Basic resource access for IMS components
+          - apiGroups: [""]
+            resources: ["nodes", "namespaces"]
+            verbs: ["get", "list", "watch"]
+          - apiGroups: [""]
+            resources: ["persistentvolumes"]
+            verbs: ["get", "list", "watch"]
+          # Metrics and monitoring access
+          - apiGroups: ["metrics.k8s.io"]
+            resources: ["nodes", "pods"]
+            verbs: ["get", "list"]
+          # OpenShift-specific resources
+          - apiGroups: ["route.openshift.io"]
+            resources: ["routes"]
+            verbs: ["get", "list", "watch"]
+          - apiGroups: ["security.openshift.io"]
+            resources: ["securitycontextconstraints"]
+            verbs: ["get", "list"]
+            resourceNames: ["restricted", "anyuid"]
+      when: workshop_environment in ['dev', 'test']
+      register: cluster_role_result
+
+    - name: "Create custom Role for namespace-specific IMS operations"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: Role
+          metadata:
+            name: "ims-namespace-operations"
+            namespace: "{{ module2_namespace }}"
+            labels:
+              workshop.redhat.com/module: "module2"
+            annotations:
+              description: "Custom role for IMS namespace operations"
+          rules:
+          # Core resource management
+          - apiGroups: [""]
+            resources: ["pods", "services", "configmaps", "secrets"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+          - apiGroups: [""]
+            resources: ["pods/log"]
+            verbs: ["get", "list"]
+          - apiGroups: [""]
+            resources: ["pods/exec"]
+            verbs: ["create"]
+            resourceNames: []
+          # Application management
+          - apiGroups: ["apps"]
+            resources: ["deployments", "replicasets"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+          - apiGroups: ["apps"]
+            resources: ["deployments/scale"]
+            verbs: ["update", "patch"]
+          # Networking
+          - apiGroups: ["networking.k8s.io"]
+            resources: ["networkpolicies"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+          # OpenShift routes
+          - apiGroups: ["route.openshift.io"]  
+            resources: ["routes"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      register: namespace_role_result
+
+    - name: "Create service accounts with role-based configuration"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: "{{ item.name }}"
+            namespace: "{{ module2_namespace }}"
+            labels:
+              app.kubernetes.io/managed-by: "ansible"
+              workshop.redhat.com/module: "module2"
+              workshop.redhat.com/role-type: "{{ item.role_type }}"
+            annotations:
+              description: "{{ item.description }}"
+              workshop.redhat.com/created-for: "{{ workshop_environment }}"
+              serviceaccount.openshift.io/oauth-redirecturi.first: "https://oauth-openshift.apps.example.com/oauth/token/implicit"
+      loop: "{{ service_accounts }}"
+      when: item.environments is not defined or workshop_environment in item.environments
+      register: sa_creation_results
+
+    - name: "Create RoleBindings for namespace operations"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: RoleBinding
+          metadata:
+            name: "{{ item.name }}-namespace-binding"
+            namespace: "{{ module2_namespace }}"
+            labels:
+              workshop.redhat.com/module: "module2"
+            annotations:
+              description: "Namespace role binding for {{ item.name }}"
+          subjects:
+          - kind: ServiceAccount
+            name: "{{ item.name }}"
+            namespace: "{{ module2_namespace }}"
+          roleRef:
+            kind: Role
+            name: "ims-namespace-operations"
+            apiGroup: rbac.authorization.k8s.io
+      loop: "{{ service_accounts }}"
+      when: item.environments is not defined or workshop_environment in item.environments
+      register: role_binding_results
+
+    - name: "Create ClusterRoleBindings for cluster-level access"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: "{{ item.name }}-cluster-{{ module2_namespace }}"
+            labels:
+              workshop.redhat.com/module: "module2"
+              workshop.redhat.com/namespace: "{{ module2_namespace }}"
+            annotations:
+              description: "Cluster role binding for {{ item.name }} in {{ module2_namespace }}"
+          subjects:
+          - kind: ServiceAccount
+            name: "{{ item.name }}"
+            namespace: "{{ module2_namespace }}"
+          roleRef:
+            kind: ClusterRole
+            name: "ims-cluster-operations"
+            apiGroup: rbac.authorization.k8s.io
+      loop: "{{ service_accounts }}"
+      when: 
+        - item.environments is not defined or workshop_environment in item.environments
+        - workshop_environment in ['dev', 'test']
+        - item.role_type in ['operator', 'admin']
+      register: cluster_binding_results
+
+    - name: "Create SecurityContextConstraints for IMS workloads"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: security.openshift.io/v1
+          kind: SecurityContextConstraints
+          metadata:
+            name: "ims-restricted-scc"
+            labels:
+              workshop.redhat.com/module: "module2"
+            annotations:
+              description: "Custom SCC for IMS workloads with mainframe connectivity requirements"
+              kubernetes.io/description: "IMS-specific security constraints"
+          allowHostDirVolumePlugin: false
+          allowHostIPC: false
+          allowHostNetwork: false
+          allowHostPID: false
+          allowHostPorts: false
+          allowPrivilegedContainer: false
+          allowedCapabilities: []
+          defaultAddCapabilities: []
+          fsGroup:
+            type: MustRunAs
+            ranges:
+            - min: 1000
+              max: 2000
+          readOnlyRootFilesystem: false
+          requiredDropCapabilities:
+          - ALL
+          runAsUser:
+            type: MustRunAsRange
+            uidRangeMin: 1000
+            uidRangeMax: 2000
+          seLinuxContext:
+            type: MustRunAs
+          supplementalGroups:
+            type: MustRunAs
+            ranges:
+            - min: 1000
+              max: 2000
+          volumes:
+          - configMap
+          - downwardAPI
+          - emptyDir
+          - persistentVolumeClaim
+          - projected
+          - secret
+          users:
+          - "system:serviceaccount:{{ module2_namespace }}:ims-connector-sa"
+          - "system:serviceaccount:{{ module2_namespace }}:ims-operator"
+          groups: []
+      when: workshop_environment == 'prod'
+      register: scc_result
+
+    - name: "Generate service account tokens for external access"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: "{{ item.name }}-token"
+            namespace: "{{ module2_namespace }}"
+            labels:
+              workshop.redhat.com/module: "module2"
+            annotations:
+              kubernetes.io/service-account.name: "{{ item.name }}"
+              description: "Token for {{ item.name }} service account"
+          type: kubernetes.io/service-account-token
+      loop: "{{ service_accounts }}"
+      when: 
+        - item.environments is not defined or workshop_environment in item.environments
+        - item.role_type in ['operator', 'admin']
+      register: token_creation_results
+
+    - name: "Verify service account permissions"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: ServiceAccount
+        name: "{{ item.name }}"
+        namespace: "{{ module2_namespace }}"
+      loop: "{{ service_accounts }}"
+      when: item.environments is not defined or workshop_environment in item.environments
+      register: sa_verification
+
+    - name: "Test RBAC permissions using auth can-i"
+      kubernetes.core.k8s_exec:
+        namespace: "{{ module2_namespace }}"
+        pod: "{{ ansible_hostname | default('test-pod') }}"
+        command: |
+          kubectl auth can-i get pods --as=system:serviceaccount:{{ module2_namespace }}:{{ item.name }}
+      loop: "{{ service_accounts }}"
+      when: 
+        - item.environments is not defined or workshop_environment in item.environments
+        - false  # Disabled for workshop - would require test pod
+      ignore_errors: true
+      register: permission_tests
+
+    - name: "Display RBAC configuration summary"
+      ansible.builtin.debug:
+        msg: |
+          === RBAC Configuration Summary ===
+          Environment: {{ workshop_environment }}
+          Namespace: {{ module2_namespace }}
+          
+          Service Accounts Created:
+          {% for item in service_accounts %}
+          {% if item.environments is not defined or workshop_environment in item.environments %}
+          - {{ item.name }} ({{ item.role_type }})
+            Description: {{ item.description }}
+            Token Secret: {{ item.name }}-token ({{ 'created' if item.role_type in ['operator', 'admin'] else 'not needed' }})
+          {% endif %}
+          {% endfor %}
+          
+          RBAC Resources:
+          - Custom ClusterRole: {{ 'Created' if cluster_role_result.changed | default(false) else 'Already exists' }}
+          - Custom Role: {{ 'Created' if namespace_role_result.changed else 'Already exists' }}
+          - RoleBindings: {{ role_binding_results.results | selectattr('changed') | list | length }} created/updated
+          - ClusterRoleBindings: {{ cluster_binding_results.results | selectattr('changed', 'defined') | selectattr('changed') | list | length }} created/updated
+          - SecurityContextConstraints: {{ 'Created' if scc_result.changed | default(false) else 'Not applicable for ' + workshop_environment }}
+
+    - name: "Export RBAC information for validation"
+      ansible.builtin.set_stats:
+        data:
+          module2_rbac_service_accounts: "{{ service_accounts | selectattr('environments', 'undefined') | list + service_accounts | selectattr('environments', 'defined') | selectattr('environments', 'contains', workshop_environment) | list }}"
+          module2_rbac_namespace: "{{ module2_namespace }}"
+          module2_rbac_environment: "{{ workshop_environment }}"
+          module2_custom_role_created: "{{ namespace_role_result.changed }}"
+          module2_scc_created: "{{ scc_result.changed | default(false) }}"

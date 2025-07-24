@@ -1,0 +1,126 @@
+---
+# Exercise 1.1: Test Single-Cluster Dynamic Inventory
+# This playbook validates that the dynamic inventory is working correctly
+
+- name: Test Single-Cluster Dynamic Inventory Discovery
+  hosts: localhost
+  gather_facts: false
+  vars:
+    inventory_file: "inventory/exercise1-1-single-cluster.yml"
+  
+  tasks:
+    - name: Display exercise information
+      debug:
+        msg: |
+          Exercise 1.1: Single-Cluster Dynamic Inventory
+          ==============================================
+          
+          This exercise tests basic OpenShift service discovery using
+          the kubernetes.core.k8s inventory plugin.
+          
+          Expected outcomes:
+          1. Discovery of running pods in non-system namespaces
+          2. Dynamic grouping by namespace, application, and node
+          3. Proper host variable assignment (cluster_name, pod_phase, etc.)
+
+    - name: Test inventory plugin directly
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        field_selectors:
+          - status.phase=Running
+      register: running_pods
+
+    - name: Display discovered pods summary
+      debug:
+        msg: |
+          Inventory Discovery Summary:
+          - Total running pods found: {{ running_pods.resources | length }}
+          - Namespaces discovered: {{ running_pods.resources | map(attribute='metadata.namespace') | unique | list }}
+          - Nodes with pods: {{ running_pods.resources | map(attribute='spec.nodeName') | select | unique | list }}
+
+    - name: Create sample test pods for inventory testing
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: "inventory-test-{{ item }}"
+            namespace: default
+            labels:
+              app: inventory-test
+              exercise: "1-1"
+              test-instance: "{{ item }}"
+          spec:
+            containers:
+            - name: test-container
+              image: busybox:latest
+              command: ['sleep', '300']
+            restartPolicy: Never
+      loop:
+        - pod1
+        - pod2
+      register: test_pods_created
+
+    - name: Wait for test pods to be running
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        name: "inventory-test-{{ item }}"
+        namespace: default
+        wait: true
+        wait_condition:
+          type: Ready
+          status: "True"
+        wait_timeout: 120
+      loop:
+        - pod1
+        - pod2
+
+    - name: Verify inventory can discover our test pods
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: default
+        label_selectors:
+          - app=inventory-test
+      register: test_pod_discovery
+
+    - name: Display test pod discovery results
+      debug:
+        msg: |
+          Test Pod Discovery Results:
+          - Created pods: {{ test_pods_created.results | selectattr('changed') | list | length }}
+          - Discovered test pods: {{ test_pod_discovery.resources | length }}
+          - Pod IPs: {{ test_pod_discovery.resources | map(attribute='status.podIP') | list }}
+
+    - name: Validation checkpoint
+      assert:
+        that:
+          - test_pod_discovery.resources | length >= 2
+          - test_pod_discovery.resources | selectattr('status.phase', 'equalto', 'Running') | list | length >= 2
+        success_msg: "✅ Exercise 1.1 validation successful - dynamic inventory is discovering pods correctly"
+        fail_msg: "❌ Exercise 1.1 validation failed - check your inventory configuration and cluster connectivity"
+
+    - name: Clean up test pods
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Pod
+        name: "inventory-test-{{ item }}"
+        namespace: default
+        state: absent
+      loop:
+        - pod1
+        - pod2
+      when: test_pod_discovery.resources | length > 0
+
+    - name: Next steps
+      debug:
+        msg: |
+          🎉 Exercise 1.1 Complete!
+          
+          Next Steps:
+          1. Run: ansible-inventory -i inventory/exercise1-1-single-cluster.yml --list
+          2. Examine the groups created (namespace_*, app_*, deployment_*, node_*)
+          3. Try running: ansible-inventory -i inventory/exercise1-1-single-cluster.yml --graph
+          4. Proceed to Exercise 1.2 for multi-cluster configuration

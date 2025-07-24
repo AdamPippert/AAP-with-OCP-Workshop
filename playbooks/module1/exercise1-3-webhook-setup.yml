@@ -1,0 +1,291 @@
+---
+# Exercise 1.3: Event-Driven Inventory Updates
+# This playbook demonstrates webhook-based inventory synchronization concepts
+
+- name: Setup Event-Driven Inventory Updates
+  hosts: localhost
+  gather_facts: false
+  vars:
+    aap_controller_url: "{{ aap_controller_url | default('http://localhost:8080') }}"
+    inventory_source_id: "{{ inventory_source_id | default('1') }}"
+    webhook_namespace: "ims-webhook-demo"
+  
+  tasks:
+    - name: Display exercise information
+      debug:
+        msg: |
+          Exercise 1.3: Event-Driven Inventory Updates
+          ============================================
+          
+          This exercise demonstrates automated inventory synchronization
+          using OpenShift webhooks and AAP automation controller integration.
+          
+          Key Concepts:
+          1. Webhook endpoints for inventory refresh triggers
+          2. OpenShift admission controllers for change detection
+          3. Automated inventory synchronization on resource changes
+          4. Error handling and retry logic for webhook failures
+          
+          Note: This is a demonstration exercise. In production environments,
+          you would configure actual AAP controller webhook endpoints.
+
+    - name: Create demonstration namespace
+      kubernetes.core.k8s:
+        name: "{{ webhook_namespace }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+        definition:
+          metadata:
+            labels:
+              webhook-demo: "true"
+              exercise: "1-3"
+
+    - name: Create webhook configuration simulation
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: inventory-webhook-config
+            namespace: "{{ webhook_namespace }}"
+          data:
+            webhook_url: "{{ aap_controller_url }}/api/v2/inventory_sources/{{ inventory_source_id }}/update/"
+            webhook_method: "POST"
+            authentication: "token"
+            retry_count: "3"
+            retry_delay: "5"
+            config.yml: |
+              # AAP Controller Inventory Source Configuration
+              # This would typically be configured in the AAP UI
+              
+              name: "Dynamic OpenShift Inventory"
+              description: "Webhook-triggered dynamic inventory for IMS environments"
+              source: "scm"
+              source_project: "ims-automation-project"
+              source_path: "inventory/exercise1-3-webhook-config.yml"
+              update_on_launch: true
+              update_cache_timeout: 60
+              
+              # Webhook configuration
+              webhook_service: "openshift"
+              webhook_key: "{{ webhook_key | default('demo-key-123') }}"
+              
+              # Schedule for periodic refresh (backup to webhooks)
+              update_on_project_update: true
+              enabled_var: "inventory_sync_enabled"
+              enabled_value: "true"
+
+    - name: Create simulated admission webhook configuration
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: admission-webhook-demo
+            namespace: "{{ webhook_namespace }}"
+          data:
+            webhook-config.yaml: |
+              # Example MutatingAdmissionWebhook for inventory sync
+              # In production, this would be a real admission webhook
+              
+              apiVersion: admissionregistration.k8s.io/v1
+              kind: MutatingAdmissionWebhook
+              metadata:
+                name: inventory-sync-webhook
+              webhooks:
+              - name: pods.inventory.sync
+                clientConfig:
+                  url: "{{ aap_controller_url }}/api/v2/inventory_sources/{{ inventory_source_id }}/update/"
+                  caBundle: "LS0tLS1CRUdJTi..." # Base64 encoded CA cert
+                rules:
+                - operations: ["CREATE", "UPDATE", "DELETE"]
+                  apiGroups: [""]
+                  apiVersions: ["v1"]
+                  resources: ["pods"]
+                namespaceSelector:
+                  matchLabels:
+                    inventory-sync: "enabled"
+                admissionReviewVersions: ["v1", "v1beta1"]
+                sideEffects: None
+                failurePolicy: Ignore  # Don't block pod operations if webhook fails
+
+    - name: Create test pods with webhook annotations
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: "webhook-test-{{ item }}"
+            namespace: "{{ webhook_namespace }}"
+            labels:
+              app: webhook-test
+              exercise: "1-3"
+            annotations:
+              inventory.webhook/enabled: "true"
+              inventory.webhook/last_updated: "{{ ansible_date_time.iso8601 }}"
+          spec:
+            containers:
+            - name: test-container
+              image: busybox:latest
+              command: ['sleep', '300']
+            restartPolicy: Never
+      loop:
+        - pod1
+        - pod2
+        - pod3
+      register: webhook_pods_created
+
+    - name: Simulate webhook trigger for inventory refresh
+      uri:
+        url: "{{ aap_controller_url }}/api/v2/inventory_sources/{{ inventory_source_id }}/update/"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+          Authorization: "Bearer {{ aap_api_token | default('demo-token') }}"
+        body_format: json
+        body:
+          webhook_trigger: true
+          source: "openshift_admission_webhook"
+          resource_type: "Pod"
+          operation: "CREATE"
+          namespace: "{{ webhook_namespace }}"
+          resource_count: "{{ webhook_pods_created.results | selectattr('changed') | list | length }}"
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+        status_code: [200, 201, 202, 404]  # 404 expected in demo environment
+      register: webhook_response
+      ignore_errors: true
+
+    - name: Display webhook simulation results
+      debug:
+        msg: |
+          Webhook Simulation Results:
+          ==========================
+          - Webhook URL: {{ aap_controller_url }}/api/v2/inventory_sources/{{ inventory_source_id }}/update/
+          - Response Status: {{ webhook_response.status | default('Connection failed (expected in demo)') }}
+          - Created pods with webhook annotations: {{ webhook_pods_created.results | selectattr('changed') | list | length }}
+          
+          In a production environment:
+          1. AAP would receive the webhook notification
+          2. Inventory source would automatically refresh
+          3. New pods would be discovered within ~60 seconds
+          4. Automation workflows could be triggered on inventory changes
+
+    - name: Demonstrate manual inventory refresh simulation
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: "{{ webhook_namespace }}"
+        label_selectors:
+          - app=webhook-test
+      register: manual_inventory_refresh
+
+    - name: Analyze webhook-enabled resources
+      set_fact:
+        webhook_enabled_pods: >-
+          {{ manual_inventory_refresh.resources | 
+             selectattr('metadata.annotations', 'defined') |
+             selectattr('metadata.annotations.inventory\.webhook/enabled', 'defined') |
+             selectattr('metadata.annotations.inventory\.webhook/enabled', 'equalto', 'true') |
+             list }}
+
+    - name: Display inventory refresh results
+      debug:
+        msg: |
+          Manual Inventory Refresh Results:
+          ================================
+          - Total pods in webhook namespace: {{ manual_inventory_refresh.resources | length }}
+          - Webhook-enabled pods: {{ webhook_enabled_pods | length }}
+          - Resource versions: {{ webhook_enabled_pods | map(attribute='metadata.resourceVersion') | list }}
+          - Creation timestamps: {{ webhook_enabled_pods | map(attribute='metadata.creationTimestamp') | list }}
+
+    - name: Create circuit breaker configuration
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: webhook-circuit-breaker
+            namespace: "{{ webhook_namespace }}"
+          data:
+            config.json: |
+              {
+                "circuit_breaker": {
+                  "failure_threshold": 5,
+                  "recovery_timeout": 300,
+                  "half_open_max_calls": 3
+                },
+                "retry_policy": {
+                  "max_attempts": 3,
+                  "base_delay": 2,
+                  "max_delay": 30,
+                  "exponential_base": 2
+                },
+                "rate_limiting": {
+                  "max_requests_per_minute": 60,
+                  "burst_size": 10
+                }
+              }
+
+    - name: Test webhook error handling simulation
+      debug:
+        msg: |
+          Webhook Error Handling Demonstration:
+          ====================================
+          
+          Circuit Breaker Pattern:
+          - Monitors webhook success/failure rates
+          - Opens circuit after {{ 5 }} consecutive failures
+          - Prevents cascading failures to AAP controller
+          - Automatically attempts recovery after {{ 300 }} seconds
+          
+          Retry Logic:
+          - Exponential backoff: 2s, 4s, 8s, up to 30s max
+          - Maximum {{ 3 }} retry attempts per webhook call
+          - Different handling for different HTTP error codes
+          
+          Rate Limiting:
+          - Maximum {{ 60 }} webhook calls per minute
+          - Burst capacity of {{ 10 }} requests
+          - Protects AAP controller from webhook storms
+
+    - name: Validation checkpoint
+      assert:
+        that:
+          - webhook_namespace is defined
+          - manual_inventory_refresh.resources | length > 0
+          - webhook_enabled_pods | length > 0
+        success_msg: "✅ Exercise 1.3 validation successful - webhook infrastructure is configured correctly"
+        fail_msg: "❌ Exercise 1.3 validation failed - check webhook configuration and pod creation"
+
+    - name: Clean up webhook demonstration resources
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Namespace
+        name: "{{ webhook_namespace }}"
+        state: absent
+        wait: true
+        wait_timeout: 120
+
+    - name: Next steps
+      debug:
+        msg: |
+          🎉 Exercise 1.3 Complete!
+          
+          Key Takeaways:
+          1. Webhook-based inventory updates provide near real-time synchronization
+          2. Circuit breaker patterns prevent cascading failures
+          3. Proper error handling and retry logic are essential
+          4. Rate limiting protects the AAP controller from overload
+          
+          Next Steps:
+          1. Review the webhook configuration examples
+          2. Understand the circuit breaker pattern implementation
+          3. Practice manual inventory refresh commands
+          4. Proceed to Exercise 1.4 for troubleshooting scenarios
+          
+          Production Setup:
+          - Configure actual AAP controller webhook endpoints
+          - Implement proper authentication and TLS
+          - Set up monitoring and alerting for webhook failures
+          - Test failover scenarios and recovery procedures

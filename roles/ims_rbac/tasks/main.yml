@@ -1,0 +1,44 @@
+---
+# Main tasks for IMS RBAC role
+
+- name: "Validate RBAC role prerequisites"
+  ansible.builtin.assert:
+    that:
+      - ims_rbac_namespace is defined
+      - ims_rbac_environment in ['dev', 'test', 'prod']
+      - ims_rbac_service_accounts is defined
+    fail_msg: "Required variables missing for IMS RBAC configuration"
+    quiet: true
+
+- name: "Include ClusterRole creation tasks"
+  ansible.builtin.include_tasks: cluster_role.yml
+  when: 
+    - ims_rbac_cluster_role.create | default(true)
+    - ims_rbac_environment in ['dev', 'test']
+
+- name: "Include namespace Role creation tasks"
+  ansible.builtin.include_tasks: namespace_role.yml
+  when: ims_rbac_namespace_role.create | default(true)
+
+- name: "Include service account creation tasks"
+  ansible.builtin.include_tasks: service_accounts.yml
+
+- name: "Include RoleBinding creation tasks"
+  ansible.builtin.include_tasks: role_bindings.yml
+
+- name: "Include ClusterRoleBinding creation tasks"
+  ansible.builtin.include_tasks: cluster_role_bindings.yml
+  when: ims_rbac_environment in ['dev', 'test']
+
+- name: "Include SecurityContextConstraints tasks"
+  ansible.builtin.include_tasks: security_context_constraints.yml
+  when: 
+    - ims_rbac_environment == 'prod'
+    - ims_rbac_scc.create_for_prod | default(true)
+
+- name: "Include token management tasks"
+  ansible.builtin.include_tasks: token_management.yml
+  when: ims_rbac_token_management.create_tokens | default(false)
+
+- name: "Include RBAC validation tasks"
+  ansible.builtin.include_tasks: validation.yml

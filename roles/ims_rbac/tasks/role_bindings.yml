@@ -1,0 +1,60 @@
+---
+# Tasks for creating RoleBindings
+
+- name: "Create RoleBindings for namespace operations"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: "{{ item.name }}-namespace-binding"
+        namespace: "{{ ims_rbac_namespace }}"
+        labels: "{{ ims_rbac_labels }}"
+        annotations: "{{ ims_rbac_annotations | combine({'description': 'Namespace role binding for ' + item.name}) }}"
+      subjects:
+      - kind: ServiceAccount
+        name: "{{ item.name }}"
+        namespace: "{{ ims_rbac_namespace }}"
+      roleRef:
+        kind: Role
+        name: "{{ ims_rbac_namespace_role.name }}"
+        apiGroup: rbac.authorization.k8s.io
+  loop: "{{ ims_rbac_service_accounts }}"
+  when: item.environments is not defined or ims_rbac_environment in item.environments
+  register: ims_role_bindings_result
+
+- name: "Create additional RoleBindings for built-in roles"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: "{{ item.name }}-{{ role_name }}-binding"
+        namespace: "{{ ims_rbac_namespace }}"
+        labels: "{{ ims_rbac_labels }}"
+        annotations: "{{ ims_rbac_annotations | combine({'description': role_name + ' role binding for ' + item.name}) }}"
+      subjects:
+      - kind: ServiceAccount
+        name: "{{ item.name }}"
+        namespace: "{{ ims_rbac_namespace }}"
+      roleRef:
+        kind: ClusterRole
+        name: "{{ role_name }}"
+        apiGroup: rbac.authorization.k8s.io
+  loop: "{{ ims_rbac_service_accounts | product(ims_rbac_profiles[ims_rbac_environment].namespace_roles) | list }}"
+  vars:
+    role_name: "{{ item.1 }}"
+  when: 
+    - item.0.environments is not defined or ims_rbac_environment in item.0.environments
+    - ims_rbac_profiles[ims_rbac_environment].namespace_roles | length > 0
+  register: ims_builtin_role_bindings_result
+
+- name: "Display RoleBinding creation status"
+  ansible.builtin.debug:
+    msg: |
+      RoleBindings created/updated:
+      - Custom role bindings: {{ ims_role_bindings_result.results | selectattr('changed') | list | length }}
+      - Built-in role bindings: {{ ims_builtin_role_bindings_result.results | selectattr('changed', 'defined') | selectattr('changed') | list | length }}
+    verbosity: 1

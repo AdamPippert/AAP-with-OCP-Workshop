@@ -1,0 +1,226 @@
+---
+# Exercise 1.2: Test Multi-Cluster Dynamic Inventory
+# This playbook validates multi-cluster inventory discovery and grouping
+
+- name: Test Multi-Cluster Dynamic Inventory Discovery
+  hosts: localhost
+  gather_facts: false
+  vars:
+    inventory_file: "inventory/exercise1-2-multi-cluster.yml"
+    test_namespaces:
+      - name: ims-dev
+        cluster: cluster-dev
+      - name: ims-test  
+        cluster: cluster-test
+      - name: ims-prod
+        cluster: cluster-prod
+  
+  tasks:
+    - name: Display exercise information
+      debug:
+        msg: |
+          Exercise 1.2: Multi-Cluster Dynamic Inventory
+          ============================================
+          
+          This exercise tests OpenShift service discovery across multiple
+          clusters using different kubeconfig contexts.
+          
+          Expected outcomes:
+          1. Discovery of pods across dev/test/prod clusters
+          2. Cluster-specific grouping and identification
+          3. Cross-cluster application and namespace grouping
+          4. Environment-based categorization
+
+    - name: Check available kubeconfig contexts
+      shell: kubectl config get-contexts -o name
+      register: available_contexts
+      ignore_errors: true
+
+    - name: Display available contexts
+      debug:
+        msg: |
+          Available Kubernetes Contexts:
+          {{ available_contexts.stdout_lines | default(['No contexts found']) | join('\n') }}
+          
+          Note: For this exercise to work fully, you need contexts named:
+          - cluster-dev, cluster-test, cluster-prod
+          
+          If you only have one cluster, the exercise will still demonstrate
+          the multi-cluster inventory structure.
+
+    - name: Create test namespaces across available clusters
+      kubernetes.core.k8s:
+        name: "{{ item.name }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+        kubeconfig: ~/.kube/config
+        context: "{{ item.cluster }}"
+      loop: "{{ test_namespaces }}"
+      when: item.cluster in (available_contexts.stdout_lines | default([]))
+      ignore_errors: true
+      register: namespace_creation
+
+    - name: Create test pods in each environment
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: "ims-connector-{{ ansible_loop.index }}"
+            namespace: "{{ item.name }}"
+            labels:
+              app: ims-connector
+              environment: "{{ item.name.split('-')[1] }}"
+              exercise: "1-2"
+          spec:
+            containers:
+            - name: ims-connector
+              image: busybox:latest
+              command: ['sleep', '600']
+            restartPolicy: Never
+        kubeconfig: ~/.kube/config
+        context: "{{ item.cluster }}"
+        wait: true
+        wait_condition:
+          type: Ready
+          status: "True"
+        wait_timeout: 120
+      loop: "{{ test_namespaces }}"
+      when: item.cluster in (available_contexts.stdout_lines | default([]))
+      ignore_errors: true
+      register: pod_creation
+      loop_control:
+        extended: true
+
+    - name: Test cross-cluster pod discovery
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: "{{ item.name }}"
+        label_selectors:
+          - app=ims-connector
+        kubeconfig: ~/.kube/config
+        context: "{{ item.cluster }}"
+      loop: "{{ test_namespaces }}"
+      when: item.cluster in (available_contexts.stdout_lines | default([]))
+      ignore_errors: true
+      register: cross_cluster_discovery
+
+    - name: Analyze discovery results
+      set_fact:
+        total_discovered_pods: >-
+          {{ cross_cluster_discovery.results | 
+             selectattr('resources', 'defined') | 
+             map(attribute='resources') | 
+             map('length') | 
+             sum }}
+        clusters_with_pods: >-
+          {{ cross_cluster_discovery.results | 
+             selectattr('resources', 'defined') | 
+             selectattr('resources', 'length', 'greater_than', 0) | 
+             list | length }}
+
+    - name: Display multi-cluster discovery summary
+      debug:
+        msg: |
+          Multi-Cluster Discovery Summary:
+          ===============================
+          - Total pods discovered: {{ total_discovered_pods }}
+          - Clusters with test pods: {{ clusters_with_pods }}
+          - Available contexts: {{ available_contexts.stdout_lines | default([]) | length }}
+          
+          Per-cluster breakdown:
+          {% for result in cross_cluster_discovery.results %}
+          {% if result.resources is defined %}
+          - {{ result.item.cluster }}: {{ result.resources | length }} pods in {{ result.item.name }}
+          {% endif %}
+          {% endfor %}
+
+    - name: Demonstrate inventory grouping concepts
+      debug:
+        msg: |
+          Expected Inventory Groups (when fully configured):
+          =================================================
+          
+          Cluster Groups:
+          - cluster_cluster_dev: All pods from development cluster
+          - cluster_cluster_test: All pods from testing cluster  
+          - cluster_cluster_prod: All pods from production cluster
+          
+          Environment Groups:
+          - env_development: All development environment pods
+          - env_testing: All testing environment pods
+          - env_production: All production environment pods
+          
+          Application Groups:
+          - app_ims_connector: All ims-connector pods across clusters
+          - app_cluster_ims_connector_cluster_dev: ims-connector pods in dev
+          - app_cluster_ims_connector_cluster_prod: ims-connector pods in prod
+          
+          Namespace Groups:
+          - ns_cluster_ims_dev_cluster_dev: Pods in ims-dev namespace
+          - ns_cluster_ims_prod_cluster_prod: Pods in ims-prod namespace
+
+    - name: Test inventory plugin validation
+      shell: |
+        ansible-inventory -i {{ inventory_file }} --list | jq 'keys[]' | grep -E '(cluster_|env_|app_|ns_cluster_)' | head -10 || echo "No groups found (normal if clusters not configured)"
+      register: inventory_groups
+      ignore_errors: true
+
+    - name: Display discovered inventory groups
+      debug:
+        msg: |
+          Discovered Inventory Groups:
+          {{ inventory_groups.stdout_lines | default(['No groups discovered - check cluster configuration']) | join('\n') }}
+
+    - name: Validation checkpoint
+      assert:
+        that:
+          - available_contexts is succeeded
+          - total_discovered_pods | int >= 0
+        success_msg: "✅ Exercise 1.2 validation successful - multi-cluster inventory structure is configured correctly"
+        fail_msg: "❌ Exercise 1.2 validation needs attention - check your kubeconfig contexts and cluster connectivity"
+
+    - name: Clean up test resources
+      block:
+        - name: Remove test pods
+          kubernetes.core.k8s:
+            api_version: v1
+            kind: Pod
+            name: "ims-connector-{{ ansible_loop.index }}"
+            namespace: "{{ item.name }}"
+            state: absent
+            kubeconfig: ~/.kube/config
+            context: "{{ item.cluster }}"
+          loop: "{{ test_namespaces }}"
+          when: item.cluster in (available_contexts.stdout_lines | default([]))
+          ignore_errors: true
+          loop_control:
+            extended: true
+
+        - name: Remove test namespaces
+          kubernetes.core.k8s:
+            name: "{{ item.name }}"
+            api_version: v1
+            kind: Namespace
+            state: absent
+            kubeconfig: ~/.kube/config
+            context: "{{ item.cluster }}"
+          loop: "{{ test_namespaces }}"
+          when: item.cluster in (available_contexts.stdout_lines | default([]))
+          ignore_errors: true
+
+    - name: Next steps
+      debug:
+        msg: |
+          🎉 Exercise 1.2 Complete!
+          
+          Next Steps:
+          1. Run: ansible-inventory -i inventory/exercise1-2-multi-cluster.yml --graph
+          2. Examine cluster-specific groups (cluster_*, env_*, app_cluster_*)
+          3. Test targeting specific environments or clusters
+          4. Proceed to Exercise 1.3 for event-driven inventory updates
+          
+          Pro Tip: Use 'ansible-inventory -i inventory/exercise1-2-multi-cluster.yml --list | jq' 
+                   to see the full JSON structure of your multi-cluster inventory

@@ -1,0 +1,137 @@
+# Exercise 1.2: Multi-Cluster Dynamic Inventory
+# This inventory configuration demonstrates OpenShift service discovery
+# across multiple clusters (dev/test/prod environments)
+
+plugin: kubernetes.core.k8s
+
+# Multi-cluster connection configuration
+# Each connection represents a different OpenShift cluster/environment
+connections:
+  # Development cluster
+  - kubeconfig: ~/.kube/config
+    context: cluster-dev
+    
+  # Testing cluster  
+  - kubeconfig: ~/.kube/config
+    context: cluster-test
+    
+  # Production cluster
+  - kubeconfig: ~/.kube/config
+    context: cluster-prod
+
+# Configure host composition with cluster identification
+compose:
+  # Use pod IP as connection target
+  ansible_host: status.podIP | default('unknown')
+  
+  # Extract cluster name from connection context
+  cluster_name: connection.context
+  
+  # Create unique host identifier across clusters
+  unique_id: metadata.name + "-" + metadata.namespace + "-" + connection.context
+  
+  # Add useful pod information
+  pod_phase: status.phase | default('Unknown')
+  node_name: spec.nodeName | default('unscheduled')
+  container_count: spec.containers | length
+  
+  # Environment classification
+  environment: >-
+    {%- if connection.context.endswith('-dev') -%}
+      development
+    {%- elif connection.context.endswith('-test') -%}
+      testing  
+    {%- elif connection.context.endswith('-prod') -%}
+      production
+    {%- else -%}
+      {{ connection.context }}
+    {%- endif -%}
+
+# Advanced dynamic grouping for multi-cluster scenarios
+keyed_groups:
+  # Group by cluster/context
+  - key: connection.context
+    prefix: cluster
+    separator: "_"
+  
+  # Group by environment type
+  - key: >-
+      {%- if connection.context.endswith('-dev') -%}
+        development
+      {%- elif connection.context.endswith('-test') -%}
+        testing
+      {%- elif connection.context.endswith('-prod') -%}
+        production
+      {%- else -%}
+        {{ connection.context }}
+      {%- endif -%}
+    prefix: env
+    separator: "_"
+  
+  # Namespace groups with cluster context
+  - key: metadata.namespace + "_" + connection.context
+    prefix: ns_cluster
+    separator: "_"
+  
+  # Application groups across clusters
+  - key: metadata.labels['app']
+    prefix: app
+    separator: "_"
+  
+  # Cross-cluster application groups
+  - key: metadata.labels['app'] + "_" + connection.context
+    prefix: app_cluster
+    separator: "_"
+  
+  # Node groups with cluster context
+  - key: spec.nodeName + "_" + connection.context
+    prefix: node_cluster
+    separator: "_"
+  
+  # Group by deployment across clusters
+  - key: metadata.ownerReferences[0].name + "_" + connection.context
+    prefix: deployment_cluster
+    separator: "_"
+
+# Filters for production-ready inventory
+filters:
+  # Only running pods
+  - status.phase == "Running"
+  
+  # Exclude system namespaces
+  - metadata.namespace not in ["kube-system", "kube-public", "kube-node-lease"]
+  
+  # Exclude OpenShift system namespaces
+  - not (metadata.namespace.startswith("openshift-") and metadata.namespace != "openshift-ingress")
+  
+  # Include only pods with proper labels
+  - metadata.labels is defined
+  
+  # Exclude completed pods
+  - metadata.deletionTimestamp is not defined
+
+# Enhanced caching for multi-cluster performance
+cache: true
+cache_plugin: memory
+cache_timeout: 180  # 3 minutes (shorter for multi-cluster)
+
+# Performance optimizations
+strict: false
+
+# Custom variables for multi-cluster operations
+# These can be used in playbooks to target specific environments
+groups:
+  # All development pods across clusters
+  development_pods: >-
+    {{ groups | select('match', '^env_development') | map('extract', hostvars) | 
+       selectattr('cluster_name', 'match', '.*-dev') | map(attribute='inventory_hostname') | list }}
+  
+  # All production pods across clusters
+  production_pods: >-
+    {{ groups | select('match', '^env_production') | map('extract', hostvars) | 
+       selectattr('cluster_name', 'match', '.*-prod') | map(attribute='inventory_hostname') | list }}
+  
+  # All testing pods across clusters
+  testing_pods: >-
+    {{ groups | select('match', '^env_testing') | map('extract', hostvars) | 
+       selectattr('cluster_name', 'match', '.*-test') | map(attribute='inventory_hostname') | list }}

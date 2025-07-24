@@ -1,0 +1,48 @@
+---
+# Tasks for creating custom ClusterRole
+
+- name: "Create custom ClusterRole for IMS operations"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRole
+      metadata:
+        name: "{{ ims_rbac_cluster_role.name }}"
+        labels: "{{ ims_rbac_labels | combine({'rbac.authorization.k8s.io/aggregate-to-view': 'true'}) }}"
+        annotations: "{{ ims_rbac_annotations | combine({'description': ims_rbac_cluster_role.description}) }}"
+      rules:
+      # Basic resource access for IMS components
+      - apiGroups: [""]
+        resources: ["nodes", "namespaces"]
+        verbs: ["get", "list", "watch"]
+      - apiGroups: [""]
+        resources: ["persistentvolumes"]
+        verbs: ["get", "list", "watch"]
+      # Metrics and monitoring access
+      - apiGroups: ["metrics.k8s.io"]
+        resources: ["nodes", "pods"]
+        verbs: ["get", "list"]
+      # OpenShift-specific resources
+      - apiGroups: ["route.openshift.io"]
+        resources: ["routes"]
+        verbs: ["get", "list", "watch"]
+      - apiGroups: ["security.openshift.io"]
+        resources: ["securitycontextconstraints"]
+        verbs: ["get", "list"]
+        resourceNames: ["restricted", "anyuid"]
+      # Image and build access
+      - apiGroups: ["image.openshift.io"]
+        resources: ["images", "imagestreams"]
+        verbs: ["get", "list", "watch"]
+      # Project/namespace information
+      - apiGroups: ["project.openshift.io"]
+        resources: ["projects"]
+        verbs: ["get", "list", "watch"]
+  register: ims_cluster_role_result
+
+- name: "Display ClusterRole creation status"
+  ansible.builtin.debug:
+    msg: |
+      ClusterRole {{ ims_rbac_cluster_role.name }}: {{ 'Created' if ims_cluster_role_result.changed else 'Already exists' }}
+    verbosity: 1

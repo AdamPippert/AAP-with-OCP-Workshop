@@ -1,0 +1,663 @@
+---
+# Module 3, Exercise 2: Comprehensive Error Handling and Retry Mechanisms
+# Learning Focus: Production-ready error handling for IMS mainframe integrations
+# Time: 15 minutes guided practice
+
+- name: "Exercise 3.2: Advanced Error Handling and Retry Patterns for IMS Integration"
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars:
+    # Build on previous exercise configuration
+    target_namespace: "{{ hostvars['localhost']['module3_namespace'] | default('ims-advanced-' + ansible_date_time.epoch) }}"
+    app_name: "{{ hostvars['localhost']['module3_app_name'] | default('ims-transaction-processor') }}"
+    workshop_environment: "{{ hostvars['localhost']['module3_environment'] | default('dev') }}"
+    
+    # Error handling configuration matrix
+    error_handling_config:
+      retry_policies:
+        connection_failure:
+          max_attempts: 5
+          initial_delay: 2
+          max_delay: 60
+          backoff_multiplier: 2.0
+          exceptions:
+            - "ConnectionTimeoutException"
+            - "ConnectException" 
+            - "NoRouteToHostException"
+        transaction_timeout:
+          max_attempts: 3
+          initial_delay: 1
+          max_delay: 30
+          backoff_multiplier: 1.5
+          exceptions:
+            - "TransactionTimeoutException"
+            - "IMSTransactionException"
+        database_deadlock:
+          max_attempts: 4
+          initial_delay: 5
+          max_delay: 45
+          backoff_multiplier: 1.8
+          exceptions:
+            - "DeadlockLoserDataAccessException"
+            - "CannotAcquireLockException"
+        mainframe_unavailable:
+          max_attempts: 10
+          initial_delay: 10
+          max_delay: 300
+          backoff_multiplier: 2.5
+          exceptions:
+            - "MainframeUnavailableException"
+            - "IMSSystemException"
+            - "RegionUnavailableException"
+    
+      circuit_breaker_config:
+        failure_threshold: 5
+        success_threshold: 3
+        timeout: 60000
+        half_open_max_calls: 3
+    
+      health_check_config:
+        startup_probe:
+          initial_delay: 30
+          period: 10
+          timeout: 5
+          failure_threshold: 30
+        liveness_probe:
+          initial_delay: 60
+          period: 30
+          timeout: 10
+          failure_threshold: 3
+        readiness_probe:
+          initial_delay: 15
+          period: 5
+          timeout: 3
+          failure_threshold: 3
+
+    # Recovery and fallback strategies
+    recovery_strategies:
+      connection_recovery:
+        - strategy: "primary_endpoint"
+          action: "retry_primary"
+          timeout: 30
+        - strategy: "secondary_endpoint"
+          action: "failover_secondary"
+          timeout: 45
+        - strategy: "tertiary_endpoint"
+          action: "failover_tertiary"
+          timeout: 60
+          condition: "{{ workshop_environment == 'prod' }}"
+        - strategy: "circuit_breaker"
+          action: "open_circuit"
+          timeout: 300
+      
+      transaction_recovery:
+        - strategy: "transaction_retry"
+          action: "retry_with_backoff"
+          max_attempts: 3
+        - strategy: "transaction_rollback"
+          action: "rollback_and_notify"
+          notification_required: true
+        - strategy: "compensating_transaction"
+          action: "execute_compensation"
+          condition: "{{ workshop_environment in ['test', 'prod'] }}"
+      
+      data_recovery:
+        - strategy: "cache_fallback"
+          action: "serve_from_cache"
+          cache_ttl: 300
+        - strategy: "readonly_mode"
+          action: "enable_readonly"
+          duration: 1800
+        - strategy: "graceful_degradation"
+          action: "reduce_functionality"
+          features_disabled: ["batch_processing", "reporting"]
+
+  tasks:
+    - name: "Validate prerequisite configuration from previous exercise"
+      block:
+        - name: "Check if namespace exists from previous exercise"
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Namespace
+            name: "{{ target_namespace }}"
+          register: namespace_check
+          
+        - name: "Verify namespace exists"
+          ansible.builtin.assert:
+            that:
+              - namespace_check.resources | length > 0
+            fail_msg: "Namespace {{ target_namespace }} not found. Run Exercise 3.1 first."
+            quiet: true
+            
+      rescue:
+        - name: "Handle missing namespace gracefully"
+          ansible.builtin.debug:
+            msg: |
+              Warning: Expected namespace {{ target_namespace }} not found.
+              Creating namespace for error handling demonstration.
+              
+        - name: "Create namespace for error handling demo"
+          kubernetes.core.k8s:
+            name: "{{ target_namespace }}"
+            api_version: v1
+            kind: Namespace
+            state: present
+            definition:
+              metadata:
+                labels:
+                  workshop.redhat.com/module: "module3"
+                  workshop.redhat.com/exercise: "3-2"
+                  workshop.redhat.com/error-handling: "advanced"
+
+    - name: "Create comprehensive error handling ConfigMap"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: "{{ app_name }}-error-handling-config"
+            namespace: "{{ target_namespace }}"
+            labels:
+              app.kubernetes.io/name: "{{ app_name }}"
+              app.kubernetes.io/component: "error-handling"
+              workshop.redhat.com/complexity: "advanced"
+            annotations:
+              description: "Advanced error handling configuration for IMS integration"
+          data:
+            # Resilience4j circuit breaker configuration
+            resilience4j.yml: |
+              resilience4j:
+                circuitbreaker:
+                  configs:
+                    default:
+                      failureRateThreshold: {{ (error_handling_config.circuit_breaker_config.failure_threshold * 20) | int }}
+                      slowCallRateThreshold: 80
+                      slowCallDurationThreshold: 2000
+                      permittedNumberOfCallsInHalfOpenState: {{ error_handling_config.circuit_breaker_config.half_open_max_calls }}
+                      minimumNumberOfCalls: 10
+                      slidingWindowSize: 20
+                      slidingWindowType: COUNT_BASED
+                      waitDurationInOpenState: {{ error_handling_config.circuit_breaker_config.timeout }}ms
+                      automaticTransitionFromOpenToHalfOpenEnabled: true
+                  instances:
+                    {% for strategy in recovery_strategies.connection_recovery %}
+                    {% if strategy.condition | default(true) %}
+                    {{ strategy.strategy | replace('_', '-') }}:
+                      baseConfig: default
+                      failureRateThreshold: {{ (50 + loop.index0 * 10) | int }}
+                      waitDurationInOpenState: {{ strategy.timeout * 1000 }}ms
+                    {% endif %}
+                    {% endfor %}
+                
+                retry:
+                  configs:
+                    default:
+                      maxAttempts: 3
+                      waitDuration: 1000ms
+                      exponentialBackoffMultiplier: 2.0
+                      retryExceptions:
+                        - java.net.ConnectException
+                        - java.net.SocketTimeoutException
+                      ignoreExceptions:
+                        - java.lang.IllegalArgumentException
+                  instances:
+                    {% for policy_name, policy_config in error_handling_config.retry_policies.items() %}
+                    {{ policy_name | replace('_', '-') }}:
+                      maxAttempts: {{ policy_config.max_attempts }}
+                      waitDuration: {{ policy_config.initial_delay }}s
+                      exponentialBackoffMultiplier: {{ policy_config.backoff_multiplier }}
+                      retryExceptions:
+                      {% for exception in policy_config.exceptions %}
+                        - {{ exception }}
+                      {% endfor %}
+                    {% endfor %}
+                
+                timelimiter:
+                  configs:
+                    default:
+                      timeoutDuration: 30s
+                      cancelRunningFuture: true
+                  instances:
+                    {% for txn_type in ['realtime', 'interactive', 'batch'] %}
+                    {{ txn_type }}-transactions:
+                      timeoutDuration: {{ 10 if txn_type == 'realtime' else 30 if txn_type == 'interactive' else 120 }}s
+                      cancelRunningFuture: true
+                    {% endfor %}
+            
+            # Spring Boot error handling configuration
+            error-handling.properties: |
+              # Advanced Error Handling Configuration
+              # Generated for {{ workshop_environment | upper }} environment
+              
+              # Circuit Breaker Configuration
+              ims.circuitbreaker.failure.threshold={{ error_handling_config.circuit_breaker_config.failure_threshold }}
+              ims.circuitbreaker.success.threshold={{ error_handling_config.circuit_breaker_config.success_threshold }}
+              ims.circuitbreaker.timeout={{ error_handling_config.circuit_breaker_config.timeout }}
+              
+              # Retry Policy Configuration
+              {% for policy_name, policy_config in error_handling_config.retry_policies.items() %}
+              ims.retry.{{ policy_name }}.max.attempts={{ policy_config.max_attempts }}
+              ims.retry.{{ policy_name }}.initial.delay={{ policy_config.initial_delay }}
+              ims.retry.{{ policy_name }}.max.delay={{ policy_config.max_delay }}
+              ims.retry.{{ policy_name }}.backoff.multiplier={{ policy_config.backoff_multiplier }}
+              {% endfor %}
+              
+              # Health Check Configuration
+              management.health.livenessstate.enabled=true
+              management.health.readinessstate.enabled=true
+              management.endpoint.health.probes.enabled=true
+              management.endpoint.health.group.liveness.include=livenessState,diskSpace
+              management.endpoint.health.group.readiness.include=readinessState,db,ims
+              
+              # Recovery Strategy Configuration
+              {% for strategy_type, strategies in recovery_strategies.items() %}
+              # {{ strategy_type | replace('_', ' ') | title }} Strategies
+              {% for strategy in strategies %}
+              {% if strategy.condition | default(true) %}
+              ims.recovery.{{ strategy_type }}.{{ strategy.strategy }}.action={{ strategy.action }}
+              {% if strategy.timeout is defined %}
+              ims.recovery.{{ strategy_type }}.{{ strategy.strategy }}.timeout={{ strategy.timeout }}
+              {% endif %}
+              {% if strategy.max_attempts is defined %}
+              ims.recovery.{{ strategy_type }}.{{ strategy.strategy }}.max.attempts={{ strategy.max_attempts }}
+              {% endif %}
+              {% endif %}
+              {% endfor %}
+              {% endfor %}
+              
+              # Environment-specific error handling
+              {% if workshop_environment == 'prod' %}
+              ims.error.handling.strict.mode=true
+              ims.error.handling.fail.fast=false
+              ims.error.handling.notification.enabled=true
+              {% elif workshop_environment == 'test' %}
+              ims.error.handling.strict.mode=true
+              ims.error.handling.fail.fast=false
+              ims.error.handling.notification.enabled=false
+              {% else %}
+              ims.error.handling.strict.mode=false
+              ims.error.handling.fail.fast=true
+              ims.error.handling.notification.enabled=false
+              {% endif %}
+            
+            # Logback configuration with structured error logging
+            logback-error-handling.xml: |
+              <?xml version="1.0" encoding="UTF-8"?>
+              <configuration>
+                  <!-- Error-specific logging configuration -->
+                  
+                  <!-- Error File Appender -->
+                  <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                      <file>/app/logs/errors.log</file>
+                      <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+                          <level>ERROR</level>
+                      </filter>
+                      <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                          <fileNamePattern>/app/logs/errors.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+                          <maxFileSize>100MB</maxFileSize>
+                          <maxHistory>{{ 30 if workshop_environment == 'prod' else 7 }}</maxHistory>
+                      </rollingPolicy>
+                      <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                          <providers>
+                              <timestamp/>
+                              <logLevel/>
+                              <loggerName/>
+                              <message/>
+                              <mdc/>
+                              <arguments/>
+                              <stackTrace/>
+                          </providers>
+                      </encoder>
+                  </appender>
+                  
+                  <!-- Retry Events Appender -->
+                  <appender name="RETRY_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                      <file>/app/logs/retries.log</file>
+                      <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                          <fileNamePattern>/app/logs/retries.%d{yyyy-MM-dd}.log</fileNamePattern>
+                          <maxHistory>7</maxHistory>
+                      </rollingPolicy>
+                      <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                          <providers>
+                              <timestamp/>
+                              <message/>
+                              <mdc/>
+                          </providers>
+                      </encoder>
+                  </appender>
+                  
+                  <!-- Circuit Breaker Events Appender -->
+                  <appender name="CIRCUIT_BREAKER_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                      <file>/app/logs/circuit-breaker.log</file>
+                      <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                          <fileNamePattern>/app/logs/circuit-breaker.%d{yyyy-MM-dd}.log</fileNamePattern>
+                          <maxHistory>7</maxHistory>
+                      </rollingPolicy>
+                      <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                          <providers>
+                              <timestamp/>
+                              <message/>
+                              <mdc/>
+                          </providers>
+                      </encoder>
+                  </appender>
+                  
+                  <!-- Specific loggers for error handling components -->
+                  <logger name="com.ims.error" level="{{ 'DEBUG' if workshop_environment == 'dev' else 'INFO' }}" additivity="false">
+                      <appender-ref ref="ERROR_FILE"/>
+                      <appender-ref ref="CONSOLE"/>
+                  </logger>
+                  
+                  <logger name="io.github.resilience4j.retry" level="INFO" additivity="false">
+                      <appender-ref ref="RETRY_FILE"/>
+                  </logger>
+                  
+                  <logger name="io.github.resilience4j.circuitbreaker" level="INFO" additivity="false">
+                      <appender-ref ref="CIRCUIT_BREAKER_FILE"/>
+                  </logger>
+                  
+                  <!-- IMS-specific error logging -->
+                  <logger name="com.ims.mainframe.connection" level="WARN" additivity="false">
+                      <appender-ref ref="ERROR_FILE"/>
+                      <appender-ref ref="CONSOLE"/>
+                  </logger>
+                  
+                  <logger name="com.ims.transaction.timeout" level="ERROR" additivity="false">
+                      <appender-ref ref="ERROR_FILE"/>
+                      <appender-ref ref="CONSOLE"/>
+                  </logger>
+              </configuration>
+      register: error_config_result
+
+    - name: "Deploy IMS service with comprehensive error handling"
+      block:
+        - name: "Update deployment with advanced error handling probes"
+          kubernetes.core.k8s:
+            state: present
+            merge_type: merge
+            definition:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: "{{ app_name }}"
+                namespace: "{{ target_namespace }}"
+                annotations:
+                  error-handling.ims.com/retry-policies: "{{ error_handling_config.retry_policies.keys() | join(',') }}"
+                  error-handling.ims.com/circuit-breaker-enabled: "true"
+                  error-handling.ims.com/recovery-strategies: "{{ recovery_strategies.keys() | join(',') }}"
+              spec:
+                template:
+                  spec:
+                    containers:
+                    - name: "{{ app_name }}"
+                      env:
+                      # Error handling environment variables
+                      - name: RESILIENCE4J_CONFIG_PATH
+                        value: "/app/config/resilience4j.yml"
+                      - name: ERROR_HANDLING_MODE
+                        value: "{{ 'strict' if workshop_environment in ['test', 'prod'] else 'permissive' }}"
+                      - name: CIRCUIT_BREAKER_ENABLED
+                        value: "true"
+                      - name: RETRY_ENABLED
+                        value: "true"
+                      - name: FALLBACK_ENABLED
+                        value: "{{ 'true' if workshop_environment != 'dev' else 'false' }}"
+                      
+                      # Health probe configuration with advanced settings
+                      startupProbe:
+                        httpGet:
+                          path: /actuator/health/readiness
+                          port: 8080
+                        initialDelaySeconds: "{{ error_handling_config.health_check_config.startup_probe.initial_delay }}"
+                        periodSeconds: "{{ error_handling_config.health_check_config.startup_probe.period }}"
+                        timeoutSeconds: "{{ error_handling_config.health_check_config.startup_probe.timeout }}"
+                        failureThreshold: "{{ error_handling_config.health_check_config.startup_probe.failure_threshold }}"
+                        
+                      livenessProbe:
+                        httpGet:
+                          path: /actuator/health/liveness
+                          port: 8080
+                        initialDelaySeconds: "{{ error_handling_config.health_check_config.liveness_probe.initial_delay }}"
+                        periodSeconds: "{{ error_handling_config.health_check_config.liveness_probe.period }}"
+                        timeoutSeconds: "{{ error_handling_config.health_check_config.liveness_probe.timeout }}"
+                        failureThreshold: "{{ error_handling_config.health_check_config.liveness_probe.failure_threshold }}"
+                        
+                      readinessProbe:
+                        httpGet:
+                          path: /actuator/health/readiness
+                          port: 8080
+                        initialDelaySeconds: "{{ error_handling_config.health_check_config.readiness_probe.initial_delay }}"
+                        periodSeconds: "{{ error_handling_config.health_check_config.readiness_probe.period }}"
+                        timeoutSeconds: "{{ error_handling_config.health_check_config.readiness_probe.timeout }}"
+                        failureThreshold: "{{ error_handling_config.health_check_config.readiness_probe.failure_threshold }}"
+                      
+                      volumeMounts:
+                      - name: error-handling-config
+                        mountPath: /app/config/error-handling
+                        readOnly: true
+                      - name: error-logs
+                        mountPath: /app/logs
+                    
+                    volumes:
+                    - name: error-handling-config
+                      configMap:
+                        name: "{{ app_name }}-error-handling-config"
+                    - name: error-logs
+                      emptyDir:
+                        sizeLimit: 1Gi
+          register: deployment_update_result
+          
+      rescue:
+        - name: "Handle deployment update failure"
+          ansible.builtin.debug:
+            msg: |
+              Warning: Failed to update existing deployment.
+              This may be expected if running Exercise 3.2 independently.
+              Error: {{ ansible_failed_result.msg | default('Unknown error') }}
+              
+        - name: "Create new deployment with error handling"
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: "{{ app_name }}"
+                namespace: "{{ target_namespace }}"
+                labels:
+                  app.kubernetes.io/name: "{{ app_name }}"
+                  app.kubernetes.io/component: "application"
+                  workshop.redhat.com/error-handling: "advanced"
+                annotations:
+                  error-handling.ims.com/retry-policies: "{{ error_handling_config.retry_policies.keys() | join(',') }}"
+                  error-handling.ims.com/circuit-breaker-enabled: "true"
+              spec:
+                replicas: 1
+                selector:
+                  matchLabels:
+                    app.kubernetes.io/name: "{{ app_name }}"
+                template:
+                  metadata:
+                    labels:
+                      app.kubernetes.io/name: "{{ app_name }}"
+                  spec:
+                    containers:
+                    - name: "{{ app_name }}"
+                      image: "registry.redhat.io/ubi8/openjdk-11:latest"
+                      ports:
+                      - containerPort: 8080
+                        name: http
+                      env:
+                      - name: ERROR_HANDLING_MODE
+                        value: "{{ 'strict' if workshop_environment in ['test', 'prod'] else 'permissive' }}"
+                      - name: CIRCUIT_BREAKER_ENABLED
+                        value: "true"
+                      startupProbe:
+                        httpGet:
+                          path: /actuator/health
+                          port: 8080
+                        initialDelaySeconds: 30
+                        periodSeconds: 10
+                        failureThreshold: 30
+                      livenessProbe:
+                        httpGet:
+                          path: /actuator/health
+                          port: 8080
+                        initialDelaySeconds: 60
+                        periodSeconds: 30
+                        failureThreshold: 3
+                      readinessProbe:
+                        httpGet:
+                          path: /actuator/health
+                          port: 8080
+                        initialDelaySeconds: 15
+                        periodSeconds: 5
+                        failureThreshold: 3
+                      volumeMounts:
+                      - name: error-handling-config
+                        mountPath: /app/config/error-handling
+                        readOnly: true
+                      - name: error-logs
+                        mountPath: /app/logs
+                    volumes:
+                    - name: error-handling-config
+                      configMap:
+                        name: "{{ app_name }}-error-handling-config"
+                    - name: error-logs
+                      emptyDir:
+                        sizeLimit: 1Gi
+          register: new_deployment_result
+
+    - name: "Create ServiceMonitor for error metrics collection"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: monitoring.coreos.com/v1
+          kind: ServiceMonitor
+          metadata:
+            name: "{{ app_name }}-error-metrics"
+            namespace: "{{ target_namespace }}"
+            labels:
+              app.kubernetes.io/name: "{{ app_name }}"
+              app.kubernetes.io/component: "monitoring"
+          spec:
+            selector:
+              matchLabels:
+                app.kubernetes.io/name: "{{ app_name }}"
+            endpoints:
+            - port: http
+              path: /actuator/prometheus
+              interval: 30s
+              scrapeTimeout: 10s
+      register: servicemonitor_result
+      failed_when: false  # ServiceMonitor may not be supported in all clusters
+
+    - name: "Test error handling scenarios"
+      block:
+        - name: "Simulate connection failure scenario"
+          ansible.builtin.uri:
+            url: "http://{{ app_name }}-service.{{ target_namespace }}.svc.cluster.local:8080/actuator/health"
+            method: GET
+            timeout: 30
+          register: health_check_result
+          failed_when: false
+          
+        - name: "Display health check results for analysis"
+          ansible.builtin.debug:
+            msg: |
+              Health Check Results:
+              - Status Code: {{ health_check_result.status | default('Failed to connect') }}
+              - Response Time: {{ health_check_result.elapsed | default('N/A') }}s
+              - Health Status: {{ health_check_result.json.status | default('Unknown') if health_check_result.json is defined else 'Service not ready' }}
+              
+      rescue:
+        - name: "Handle expected health check failure during startup"
+          ansible.builtin.debug:
+            msg: |
+              Expected behavior: Service may not be ready immediately.
+              This demonstrates the startup probe and error handling in action.
+              Error: {{ ansible_failed_result.msg | default('Connection failed') }}
+
+    - name: "Wait for deployment with retry logic"
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ app_name }}"
+        namespace: "{{ target_namespace }}"
+        wait: true
+        wait_condition:
+          type: Available
+          status: "True"
+        wait_timeout: 300
+      register: deployment_wait_result
+      retries: 3
+      delay: 30
+      until: deployment_wait_result.resources[0].status.readyReplicas | default(0) > 0
+
+    - name: "Analyze deployment error handling configuration"
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ app_name }}"
+        namespace: "{{ target_namespace }}"
+      register: final_deployment_state
+
+    - name: "Display comprehensive error handling summary"
+      ansible.builtin.debug:
+        msg: |
+          === Advanced Error Handling Implementation Summary ===
+          
+          Environment: {{ workshop_environment | upper }}
+          Application: {{ app_name }}
+          Namespace: {{ target_namespace }}
+          
+          Error Handling Features Implemented:
+          1. ✅ Retry Policies ({{ error_handling_config.retry_policies.keys() | length }} configured)
+             {% for policy in error_handling_config.retry_policies.keys() %}
+             - {{ policy | replace('_', ' ') | title }}: {{ error_handling_config.retry_policies[policy].max_attempts }} attempts
+             {% endfor %}
+          
+          2. ✅ Circuit Breaker Configuration
+             - Failure Threshold: {{ error_handling_config.circuit_breaker_config.failure_threshold }}
+             - Success Threshold: {{ error_handling_config.circuit_breaker_config.success_threshold }}
+             - Timeout: {{ error_handling_config.circuit_breaker_config.timeout }}ms
+          
+          3. ✅ Recovery Strategies ({{ recovery_strategies.keys() | length }} types)
+             {% for strategy_type in recovery_strategies.keys() %}
+             - {{ strategy_type | replace('_', ' ') | title }}: {{ recovery_strategies[strategy_type] | length }} strategies
+             {% endfor %}
+          
+          4. ✅ Advanced Health Probes
+             - Startup Probe: {{ error_handling_config.health_check_config.startup_probe.failure_threshold }} failures allowed
+             - Liveness Probe: {{ error_handling_config.health_check_config.liveness_probe.period }}s interval
+             - Readiness Probe: {{ error_handling_config.health_check_config.readiness_probe.period }}s interval
+          
+          5. ✅ Structured Error Logging
+             - Error logs: /app/logs/errors.log
+             - Retry logs: /app/logs/retries.log
+             - Circuit breaker logs: /app/logs/circuit-breaker.log
+          
+          6. {{ '✅' if servicemonitor_result.changed else '⚠️' }} Metrics Collection
+             - ServiceMonitor: {{ 'Created' if servicemonitor_result.changed else 'Not supported in this cluster' }}
+          
+          Deployment Status:
+          - Ready Replicas: {{ final_deployment_state.resources[0].status.readyReplicas | default(0) }}
+          - Available Replicas: {{ final_deployment_state.resources[0].status.availableReplicas | default(0) }}
+          - Configuration Applied: {{ 'Yes' if deployment_update_result.changed or new_deployment_result.changed else 'No changes' }}
+          
+          Error Handling Mode: {{ 'Strict (Production-ready)' if workshop_environment in ['test', 'prod'] else 'Permissive (Development)' }}
+          
+          Next Exercise: Advanced troubleshooting and validation techniques
+
+    - name: "Export error handling configuration for next exercise"
+      ansible.builtin.set_stats:
+        data:
+          module3_error_handling_namespace: "{{ target_namespace }}"
+          module3_error_handling_app: "{{ app_name }}"
+          module3_retry_policies_count: "{{ error_handling_config.retry_policies.keys() | length }}"
+          module3_recovery_strategies_count: "{{ recovery_strategies.keys() | length }}"
+          module3_circuit_breaker_enabled: true
+          module3_health_probes_configured: true
+          module3_error_logging_enabled: true
