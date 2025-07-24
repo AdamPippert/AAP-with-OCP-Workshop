@@ -2,249 +2,379 @@
 
 **Co-developed by Red Hat Telco and AI**
 
-This repository contains a comprehensive 2.5-hour instructor-led workshop focused on advanced Ansible Automation Platform (AAP) 2.5 integration with OpenShift Container Platform for Information Management System (IMS) environment deployment patterns.
+This repository contains a comprehensive workshop delivery system for the Advanced Ansible Automation Platform (AAP) 2.5 integration with OpenShift Container Platform. The workshop includes automated multi-user setup, browser-based VSCode development environments, and automated email notifications for participants.
 
-## Workshop Overview
+## 🎯 Workshop Overview
 
 ### Target Audience
-- System administrators and DevOps engineers
-- Teams working on mainframe modernization projects
+- System administrators and DevOps engineers working on mainframe modernization
+- Teams implementing AAP and OpenShift integration patterns
 - Practitioners with basic AAP 2.5 knowledge (prerequisite: "Basic Deployment AAP 2.5" course)
 
-### Learning Objectives
-- Master advanced inventory management patterns for multi-cluster OpenShift environments
-- Implement production-ready RBAC automation and idempotent resource deployment
-- Develop sophisticated error handling and troubleshooting automation
-- Deploy enterprise-scale IMS workloads using AAP and OpenShift integration
+### Workshop Modules
+- **Module 1:** Dynamic Inventory and AAP Integration (40 minutes)
+- **Module 2:** Idempotent Resource Management and RBAC (45 minutes)  
+- **Module 3:** Advanced Automation and Error Handling (45 minutes)
 
-## Workshop Structure
+### Key Features
+- 🖥️ **Browser-based VSCode environments** for each participant
+- 🤖 **Automated AAP Controller setup** with job templates and credentials
+- ☸️ **OpenShift integration** with RBAC and resource management
+- 📧 **Automated email notifications** with personalized access details
+- 📊 **Multi-user management** supporting 50+ participants
+- 🚀 **One-command deployment** for complete workshop setup
 
-### Module 1: Dynamic Inventory and AAP Integration (40 minutes)
-**Focus:** Multi-cluster inventory management and event-driven synchronization
-- Advanced inventory discovery patterns
-- Cross-cluster application grouping
-- Environment-based categorization
-- Systematic troubleshooting approaches
-
-### Module 2: Idempotent Resource Management and RBAC (45 minutes)
-**Focus:** Production-ready deployment patterns with enterprise security
-- Automated RBAC management with least-privilege principles
-- Idempotent resource deployment using `redhat.openshift` collection
-- Service account lifecycle management
-- Security context constraints for IMS workloads
-
-### Module 3: Advanced Automation and Error Handling (45 minutes)
-**Focus:** Complex templating and systematic troubleshooting
-- Advanced Jinja2 templating for environment-specific configurations
-- Comprehensive error handling with retry mechanisms
-- Molecule framework integration for automated testing
-- Diagnostic automation and performance monitoring
-
-## Repository Structure
-
-```
-AAP-with-OCP-Workshop/
-├── docs/                           # Workshop guides and documentation
-│   ├── module1-workshop-guide.md   # Module 1 exercise guide
-│   ├── module2-workshop-guide.md   # Module 2 exercise guide
-│   ├── module3-workshop-guide.md   # Module 3 exercise guide
-│   ├── workshop-admin.md           # Administrator setup guide
-│   └── html/                       # HTML versions of guides
-├── playbooks/                      # Ansible playbooks (one per module)
-│   ├── module1/                    # Dynamic inventory exercises
-│   ├── module2/                    # RBAC and deployment exercises
-│   └── module3/                    # Advanced automation exercises
-├── roles/                          # Reusable Ansible roles
-├── scripts/                        # Infrastructure automation scripts
-│   ├── exercise0/                  # Workshop environment setup
-│   ├── build-admin-page.sh         # Admin page generator
-│   ├── deploy-admin-page.sh        # OpenShift deployment script
-│   ├── setup_aap_resources.sh      # AAP resource management
-│   └── build_execution_environment.sh # Custom EE builder
-├── execution-environment/          # Custom execution environment definition
-│   ├── execution-environment.yml   # ansible-builder configuration
-│   ├── requirements.yml            # Ansible collections
-│   ├── requirements.txt            # Python dependencies
-│   └── bindep.txt                  # System packages
-└── specs/                          # Workshop requirements and architecture
-```
-
-## Quick Start
+## 🚀 Quick Start for Workshop Delivery
 
 ### Prerequisites
 - OpenShift cluster with admin access
-- Ansible Automation Platform 2.5 access
 - `oc` CLI configured and authenticated
+- Workshop details from Red Hat Demo Platform (RHDP)
 - Bash shell environment (Linux/macOS/WSL)
-- Ansible 2.5 Product Demo environment from Red Hat Demo Platform (accessible by RH or partners)
-- details.txt file created from the "Users" section in the Demo Platform using the "Data" field
 
-### Workshop Setup
+### Complete Workshop Setup
 
-1. **Clone Repository**
-   ```bash
-   git clone <repository-url>
-   cd AAP-with-OCP-Workshop
-   ```
-
-2. **Configure Environment**
-   ```bash
-   # Ensure details.txt is populated by workshop moderator
-   # Run complete workshop setup
-   ./scripts/exercise0/setup_workshop.sh
-   ```
-
-3. **Generate Admin Resources**
-   ```bash
-   # Build admin access page
-   ./scripts/build-admin-page.sh
-   
-   # Deploy to OpenShift cluster
-   ./scripts/deploy-admin-page.sh
-   ```
-
-4. **Verify AAP Integration**
-   ```bash
-   # Check created resources
-   ./scripts/setup_aap_resources.sh show
-   ```
-
-## Key Features
-
-### Automated AAP Controller Integration
-- **Project Creation**: Git-based project with workshop playbooks
-- **Inventory Management**: OpenShift cluster inventory with workshop variables
-- **Credential Management**: Bearer token credentials for cluster access
-- **Job Templates**: 10 pre-configured templates covering all exercises
-- **Execution Environment**: Custom EE with kubernetes.core collection
-
-### Custom Execution Environment
-Built with `ansible-builder` and includes:
-- kubernetes.core and redhat.openshift collections
-- Pre-installed OpenShift CLI tools (oc, kubectl)
-- Python dependencies for Kubernetes/OpenShift integration
-- Red Hat UBI8 base image for security compliance
-
-### Professional Admin Interface
-- HTML-based access page with lab credentials
-- OpenShift route deployment with TLS termination
-- Bearer token integration for seamless authentication
-- Comprehensive resource management and cleanup
-
-### Enterprise Security Features
-- RBAC automation with least-privilege principles
-- Service account lifecycle management
-- Security context constraints for workloads
-- Network policies for mainframe connectivity
-
-## Administration
-
-### Resource Management
+#### Step 1: Clone and Prepare Repository
 ```bash
-# Create all AAP resources
-./scripts/setup_aap_resources.sh setup
-
-# Build execution environment only
-./scripts/setup_aap_resources.sh build-ee
-
-# Display created resources
-./scripts/setup_aap_resources.sh show
-
-# Clean up after workshop
-./scripts/setup_aap_resources.sh cleanup
+git clone <repository-url>
+cd AAP-with-OCP-Workshop
 ```
 
-### Execution Environment Management
+#### Step 2: Obtain Workshop Details
+1. Request AAP Product Demo environments from RHDP (Red Hat Demo Platform)
+2. For workshops with 30+ users, request multiple environments:
+   - `workshop_details.txt` (users 1-30)
+   - `workshop_details2.txt` (users 31-60)
+   - Add more files as needed for larger workshops
+
+3. Download the "bulk export" data from RHDP and save as `workshop_details.txt` in the repository root
+
+#### Step 3: Parse Workshop Details
 ```bash
-# Build with defaults
-./scripts/build_execution_environment.sh
+# Parse workshop details for all users
+./scripts/parse_workshop_details.sh -v
 
-# Build and push to registry
-./scripts/build_execution_environment.sh -r quay.io/myorg -p
-
-# Force rebuild with custom tag
-./scripts/build_execution_environment.sh -t workshop-v1.0 --force
+# Review parsed users
+cat user_environments/users.csv
+cat user_environments/summary.txt
 ```
 
-### Maintenance Tasks
+#### Step 4: Deploy Complete Workshop Infrastructure
+```bash
+# Deploy AAP environments, VSCode servers, and generate emails
+./scripts/setup_multi_user.sh --vscode --generate-emails -p 10 -v
 
-**Before Each Workshop:**
-1. Update `details.txt` with current lab environment details
-2. Run complete setup: `./scripts/exercise0/setup_workshop.sh`
-3. Verify AAP resources: `./scripts/setup_aap_resources.sh show`
-4. Test job template execution in AAP Controller
-5. Deploy admin page: `./scripts/deploy-admin-page.sh`
+# This command will:
+# - Set up AAP Controller for each user
+# - Deploy VSCode development environments  
+# - Create OpenShift routes and services
+# - Generate personalized email notifications
+# - Validate all environments
+```
 
-**After Each Workshop:**
-1. Clean up AAP resources: `./scripts/setup_aap_resources.sh cleanup`
-2. Rotate all exposed credentials
-3. Delete workshop namespaces and generated files
-4. Archive workshop logs and feedback
+#### Step 5: Validate and Send Notifications
+```bash
+# Validate all environments are working
+./scripts/validate_multi_user.sh --full
 
-## Technical Architecture
+# Review generated emails
+ls workshop_emails/
+cat workshop_emails/DELIVERY_INSTRUCTIONS.md
 
-### Deployment Patterns
-- **Environment Progression**: dev (4 CPU/8GB) → test (8 CPU/16GB) → prod (16 CPU/32GB)
-- **Resource Quotas**: Configurable per environment with automatic scaling
-- **Network Policies**: Mainframe connectivity patterns with security controls
-- **Service Mesh**: Optional Istio integration for advanced traffic management
+# Send emails to participants (multiple options available)
+# See "Email Delivery Options" section below
+```
 
-### Integration Points
-- **AAP Controller**: REST API integration for resource lifecycle management
-- **OpenShift**: Bearer token authentication with RBAC automation
-- **Container Registry**: Support for private registries and image management
-- **Git Repository**: Source control integration for playbook management
+### 📧 Email Delivery Options
 
-### Monitoring and Observability
-- **Health Checks**: Automated validation for all workshop components
-- **Logging**: Centralized log collection and analysis
-- **Metrics**: Performance monitoring and resource utilization tracking
-- **Alerting**: Proactive notification for workshop issues
+The system generates multiple formats for sending credentials to participants:
 
-## Troubleshooting
+#### Option A: Gmail Mail Merge (Recommended)
+```bash
+# Use the generated CSV file
+open workshop_emails/workshop_emails.csv
+
+# Instructions:
+# 1. Import CSV into Google Sheets
+# 2. Install "Mail Merge" add-on
+# 3. Create email template with merge fields
+# 4. Send personalized emails to all users
+```
+
+#### Option B: Individual HTML Emails
+```bash
+# Use individual HTML files
+open workshop_emails/html/
+
+# For each user:
+# 1. Open user##_email.html in browser
+# 2. Copy the formatted content
+# 3. Paste into your email client
+# 4. Send to participant
+```
+
+#### Option C: Outlook Mail Merge
+```bash
+# Use CSV with Outlook's built-in mail merge
+# 1. Mailings → Start Mail Merge → E-mail Messages
+# 2. Select Recipients → Use Existing List
+# 3. Choose workshop_emails/workshop_emails.csv
+# 4. Create template and complete merge
+```
+
+## 📊 Workshop Management Commands
+
+### Multi-User Operations
+```bash
+# Setup specific user range
+./scripts/setup_multi_user.sh -u 1-10 --vscode
+
+# Resume failed setups
+./scripts/setup_multi_user.sh --resume
+
+# Force re-setup specific users
+./scripts/setup_multi_user.sh -u 5,8,12 --force
+
+# High-parallel setup for large workshops
+./scripts/setup_multi_user.sh -p 15 --vscode --generate-emails
+```
+
+### VSCode Environment Management
+```bash
+# Check deployment status
+./scripts/manage_vscode.sh status
+
+# Get user access URLs
+./scripts/manage_vscode.sh url
+./scripts/manage_vscode.sh url -u 1-10
+
+# Restart VSCode instances
+./scripts/manage_vscode.sh restart -u 5
+
+# View logs for troubleshooting
+./scripts/manage_vscode.sh logs -u 3
+
+# Remove VSCode instances
+./scripts/manage_vscode.sh undeploy -u 1-5
+```
+
+### Environment Validation
+```bash
+# Quick connectivity check
+./scripts/validate_multi_user.sh --quick
+
+# Full validation with details
+./scripts/validate_multi_user.sh --full -v
+
+# Validate specific users
+./scripts/validate_multi_user.sh -u 1-5 --full
+```
+
+### Email Management
+```bash
+# Generate all email formats
+./scripts/generate_workshop_emails.sh
+
+# Generate specific format
+./scripts/generate_workshop_emails.sh --format csv
+
+# Generate for specific users
+./scripts/generate_workshop_emails.sh -u 1-10 --format html
+
+# Customize email content
+./scripts/generate_workshop_emails.sh \
+  --exercises-url "https://your-workshop.com" \
+  --instructor "instructor@redhat.com"
+```
+
+## 🏗️ Repository Structure
+
+```
+AAP-with-OCP-Workshop/
+├── scripts/                          # Automation scripts
+│   ├── parse_workshop_details.sh     # Parse RHDP bulk exports
+│   ├── setup_multi_user.sh           # Multi-user workshop setup
+│   ├── validate_multi_user.sh        # Environment validation
+│   ├── deploy_vscode.sh               # VSCode server deployment
+│   ├── manage_vscode.sh               # VSCode management
+│   ├── generate_workshop_emails.sh    # Email generation
+│   └── exercise0/setup_workshop.sh    # Individual user setup
+├── manifests/                         # OpenShift manifests
+│   └── vscode-server/                 # VSCode deployment configs
+│       ├── namespace.yaml             # VSCode namespace setup
+│       ├── deployment-template.yaml   # Per-user VSCode instances
+│       ├── configmap.yaml             # VSCode configuration
+│       └── serviceaccount.yaml        # RBAC configuration
+├── templates/                         # Content templates
+│   ├── email/                         # Email templates
+│   └── vscode-workspace-content.yaml  # VSCode workspace setup
+├── user_environments/                 # Generated user configs
+│   ├── .env01, .env02, ...            # Individual user environments
+│   ├── users.csv                      # User assignment tracking
+│   └── logs/                          # Setup and validation logs
+├── workshop_emails/                   # Generated email content
+│   ├── DELIVERY_INSTRUCTIONS.md       # Email delivery guide
+│   ├── workshop_emails.csv            # Mail merge data
+│   ├── html/                          # Individual HTML emails
+│   └── outlook/                       # Outlook-compatible format
+├── docs/                              # Documentation
+│   └── multi-user-setup.md           # Complete setup guide
+└── playbooks/                         # Workshop exercises
+    ├── exercise1-dynamic-inventory.yml
+    ├── exercise2-idempotent-resources.yml
+    └── exercise3-advanced-automation.yml
+```
+
+## 🛠️ Workshop Environment Details
+
+### Per-User Resources
+Each workshop participant receives:
+- **VSCode Environment**: Browser-based IDE with pre-configured tools
+- **AAP Controller**: Dedicated project with job templates and credentials
+- **OpenShift Access**: RBAC-configured access to workshop namespaces
+- **Persistent Storage**: 2Gi volume for VSCode workspace
+- **Personalized Email**: All access details and quick start guide
+
+### VSCode Environment Features
+- **Pre-installed Extensions**: Ansible, OpenShift, Python, YAML support
+- **Workshop Content**: All exercises and documentation pre-loaded
+- **Terminal Access**: Direct `oc` and `ansible` command line tools
+- **Persistent Sessions**: Work survives browser restarts
+- **Resource Limits**: 500m CPU, 1Gi RAM per instance
+
+### Email Notification Content
+Each participant receives a personalized email with:
+- 🖥️ **VSCode URL and password** for immediate access
+- 🤖 **AAP Controller credentials** and dashboard link
+- ☸️ **OpenShift console access** and API endpoints
+- 📚 **Workshop materials** and exercise instructions
+- 🚀 **Quick start guide** with test commands
+- ❓ **Support contact** information
+
+## 📚 Workshop Delivery Workflow
+
+### Pre-Workshop (Instructor Setup)
+```bash
+# 1. Parse workshop details
+./scripts/parse_workshop_details.sh
+
+# 2. Deploy complete infrastructure
+./scripts/setup_multi_user.sh --vscode --generate-emails -p 10
+
+# 3. Validate all environments
+./scripts/validate_multi_user.sh --full
+
+# 4. Send participant emails (using preferred method)
+# See workshop_emails/DELIVERY_INSTRUCTIONS.md
+
+# 5. Test with sample user environment
+# Access user01 VSCode and verify all tools work
+```
+
+### During Workshop (Monitoring)
+```bash
+# Monitor VSCode instances
+./scripts/manage_vscode.sh status
+
+# Restart problematic instances
+./scripts/manage_vscode.sh restart -u 7
+
+# Quick environment validation
+./scripts/validate_multi_user.sh --quick
+
+# Get URLs for participant support
+./scripts/manage_vscode.sh url -u 5
+```
+
+### Post-Workshop (Cleanup)
+```bash
+# Remove VSCode instances
+./scripts/manage_vscode.sh undeploy
+
+# Clean up user environments (optional)
+rm -rf user_environments/
+
+# Archive workshop data
+tar -czf workshop-$(date +%Y%m%d).tar.gz workshop_emails/ user_environments/logs/
+```
+
+## 🔧 Advanced Configuration
+
+### Custom Workshop Settings
+```bash
+# Set custom workshop details
+export WORKSHOP_NAME="Custom AAP Workshop"
+export INSTRUCTOR_EMAIL="instructor@company.com"
+export EXERCISES_URL="https://your-materials.com"
+
+# Run setup with custom settings
+./scripts/setup_multi_user.sh --vscode --generate-emails
+```
+
+### Resource Scaling
+```bash
+# High-parallel setup for large workshops
+./scripts/setup_multi_user.sh -p 20 --vscode
+
+# Process users in batches
+./scripts/setup_multi_user.sh -u 1-25 --vscode
+./scripts/setup_multi_user.sh -u 26-50 --vscode
+```
+
+### Troubleshooting
+```bash
+# Check individual user logs
+cat user_environments/logs/setup_user05.log
+
+# Validate specific user environment
+./scripts/validate_multi_user.sh -u 5 --full -v
+
+# Check VSCode deployment status
+oc get pods -n workshop-vscode
+
+# Restart failed setups
+./scripts/setup_multi_user.sh --resume -v
+```
+
+## 📖 Documentation
+
+- **[Multi-User Setup Guide](docs/multi-user-setup.md)**: Complete documentation for workshop setup
+- **[VSCode Server Guide](docs/multi-user-setup.md#vscode-server-management)**: VSCode deployment and management
+- **[Email System Guide](docs/multi-user-setup.md#workshop-email-notifications)**: Email generation and delivery
+- **[Troubleshooting Guide](docs/multi-user-setup.md#troubleshooting)**: Common issues and solutions
+
+## 🎓 Workshop Success Metrics
+
+A successful workshop deployment includes:
+- ✅ All user environments validated and accessible
+- ✅ VSCode instances running with correct permissions
+- ✅ AAP Controller projects and job templates created
+- ✅ Email notifications delivered to all participants
+- ✅ Workshop materials pre-loaded in VSCode workspaces
+- ✅ Instructor monitoring and management tools available
+
+## 🆘 Support and Troubleshooting
 
 ### Common Issues
+- **Environment parsing failures**: Check RHDP export format
+- **VSCode deployment issues**: Verify OpenShift permissions and resources
+- **Email generation problems**: Ensure all environments are set up correctly
+- **Access credential issues**: Validate AAP Controller and OpenShift connectivity
 
-**Build Failures:**
-- Ensure container runtime (Docker/Podman) is available
-- Verify access to registry.redhat.io for base images
-- Check ansible-builder installation and version
+### Getting Help
+1. **Check logs**: Review individual user logs in `user_environments/logs/`
+2. **Validate environments**: Run full validation with verbose output
+3. **Review documentation**: See `docs/multi-user-setup.md` for detailed guidance
+4. **Test with single user**: Use `-u 1` flags to test individual setups
 
-**AAP Connectivity:**
-- Verify AAP Controller URL and credentials in details.txt
-- Test API connectivity: `curl -k ${AAP_URL}/api/v2/ping/`
-- Check bearer token validity and permissions
+## 🚀 Ready to Run Your Workshop?
 
-**OpenShift Access:**
-- Confirm bearer token authentication: `oc whoami`
-- Verify cluster connectivity: `oc cluster-info`
-- Check namespace permissions and resource quotas
-
-### Support Resources
-- Workshop guides: `docs/module*-workshop-guide.html`
-- Architecture details: `specs/workshop_PRD.md`
-- OpenShift documentation: https://docs.openshift.com/
-- Ansible AAP documentation: https://docs.ansible.com/automation-controller/
-
-## Contributing
-
-This workshop is designed for enterprise deployment and follows strict quality standards:
-
-- All code must pass linting and security validation
-- Playbooks must be idempotent and safely re-executable
-- Documentation must be comprehensive and maintained
-- Changes require testing in multi-cluster environments
-
-## License
-
-This workshop content is provided under standard enterprise licensing terms. Please consult with Red Hat Telco regarding usage and distribution rights.
-
-## Development Team
-
-**Co-developed by Red Hat Telco and AI**
-
-This workshop represents the collaborative effort between Red Hat's Telco engineering teams and advanced AI systems, combining deep industry expertise with automated development capabilities to deliver comprehensive training content for enterprise environments.
+1. **Clone the repository**
+2. **Add your `workshop_details.txt` file**
+3. **Run**: `./scripts/setup_multi_user.sh --vscode --generate-emails`
+4. **Send emails to participants**
+5. **Start teaching!**
 
 ---
 
-*Advanced Ansible Automation Platform 2.5 with OpenShift Workshop - Production-ready automation training for enterprise scale deployments.*
+*This workshop delivery system streamlines the complex process of setting up enterprise-scale AAP and OpenShift training environments, allowing instructors to focus on teaching rather than infrastructure management.*

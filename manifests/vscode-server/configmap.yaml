@@ -1,0 +1,176 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vscode-workshop-config
+  namespace: workshop-vscode
+  labels:
+    workshop.component: "vscode-server"
+data:
+  ansible.cfg: |
+    [defaults]
+    host_key_checking = False
+    retry_files_enabled = False
+    command_warnings = False
+    callback_whitelist = profile_tasks, timer
+    stdout_callback = yaml
+    bin_ansible_callbacks = True
+    gathering = smart
+    fact_caching = memory
+    interpreter_python = auto_silent
+    
+    [inventory]
+    enable_plugins = kubernetes.core.k8s, redhat.openshift.openshift
+    
+    [persistent_connection]
+    connect_timeout = 60
+    command_timeout = 60
+    
+    [paramiko_connection]
+    record_host_keys = False
+    
+    [ssh_connection]
+    ssh_args = -o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes
+  
+  requirements.yml: |
+    ---
+    collections:
+      # Core Kubernetes/OpenShift integration
+      - name: kubernetes.core
+        version: "3.0.1"
+      
+      # OpenShift specific collection
+      - name: redhat.openshift
+        version: "2.3.0"
+      
+      # Community general collection
+      - name: community.general
+        version: "7.5.0"
+      
+      # Community crypto collection
+      - name: community.crypto
+        version: "2.17.0"
+      
+      # POSIX collection
+      - name: ansible.posix
+        version: "1.5.4"
+      
+      # Community Docker collection
+      - name: community.docker
+        version: "3.4.11"
+      
+      # Community OpenShift collection
+      - name: community.okd
+        version: "2.3.0"
+      
+      # Ansible Utils collection
+      - name: ansible.utils
+        version: "2.12.0"
+      
+      # Community Kubernetes collection
+      - name: community.kubernetes
+        version: "2.0.1"
+  
+  requirements.txt: |
+    # Python requirements for Ansible collections
+    kubernetes>=24.2.0
+    openshift>=0.13.1
+    PyYAML>=6.0
+    jinja2>=3.1.0
+    requests>=2.28.0
+    urllib3>=1.26.0
+    jsonpatch>=1.32
+    
+    # Additional tools for workshop exercises
+    pyyaml-include>=1.3.0
+    netaddr>=0.8.0
+    dnspython>=2.2.0
+    
+    # Development and debugging tools
+    ansible-lint>=6.0.0
+    yamllint>=1.28.0
+    jmespath>=1.0.0
+  
+  settings.json: |
+    {
+      "workbench.colorTheme": "Default Dark+",
+      "workbench.startupEditor": "readme",
+      "editor.fontSize": 14,
+      "editor.tabSize": 2,
+      "editor.insertSpaces": true,
+      "editor.renderWhitespace": "boundary",
+      "editor.rulers": [80, 120],
+      "files.associations": {
+        "*.yml": "ansible",
+        "*.yaml": "ansible"
+      },
+      "yaml.schemas": {
+        "https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json": [
+          "playbooks/*.yml",
+          "playbooks/*.yaml",
+          "roles/*/tasks/*.yml",
+          "roles/*/tasks/*.yaml",
+          "roles/*/handlers/*.yml",
+          "roles/*/handlers/*.yaml"
+        ]
+      },
+      "ansible.python.interpreterPath": "/usr/local/bin/python3",
+      "ansible.executionEnvironment.enabled": false,
+      "ansible.validation.enabled": true,
+      "ansible.validation.lint.enabled": true,
+      "ansible.completion.provideRedirectModules": true,
+      "ansible.completion.provideModuleOptionAliases": true,
+      "redhat.telemetry.enabled": false,
+      "terminal.integrated.defaultProfile.linux": "bash",
+      "terminal.integrated.cwd": "/workspace"
+    }
+  
+  extensions.json: |
+    {
+      "recommendations": [
+        "redhat.ansible",
+        "ms-python.python",
+        "ms-python.pylint",
+        "redhat.vscode-yaml",
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "redhat.vscode-openshift-connector",
+        "formulahendry.auto-rename-tag",
+        "streetsidesoftware.code-spell-checker",
+        "github.copilot"
+      ]
+    }
+  
+  workspace.code-workspace: |
+    {
+      "folders": [
+        {
+          "name": "Workshop Root",
+          "path": "/workspace"
+        },
+        {
+          "name": "Playbooks",
+          "path": "/workspace/playbooks"
+        },
+        {
+          "name": "Roles",
+          "path": "/workspace/roles"
+        },
+        {
+          "name": "Inventory",
+          "path": "/workspace/inventory"
+        }
+      ],
+      "settings": {
+        "ansible.python.interpreterPath": "/usr/local/bin/python3",
+        "python.defaultInterpreterPath": "/usr/local/bin/python3"
+      },
+      "extensions": {
+        "recommendations": [
+          "redhat.ansible",
+          "ms-python.python",
+          "redhat.vscode-yaml",
+          "ms-kubernetes-tools.vscode-kubernetes-tools",
+          "redhat.vscode-openshift-connector"
+        ]
+      }
+    }

@@ -1,0 +1,328 @@
+---
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: vscode-server-instance
+  namespace: workshop-vscode
+  labels:
+    workshop.component: "vscode-server"
+  annotations:
+    description: "VSCode Server instance for AAP Workshop user"
+    openshift.io/display-name: "Workshop VSCode Server"
+    tags: "vscode,ansible,workshop"
+parameters:
+- name: USER_NUMBER
+  description: "User number (e.g., 01, 02, 03)"
+  required: true
+- name: USER_EMAIL
+  description: "User email address"
+  required: true
+- name: WORKSHOP_GUID
+  description: "Workshop GUID for this user"
+  required: true
+- name: OCP_CLUSTER_DOMAIN
+  description: "OpenShift cluster domain"
+  required: true
+- name: AAP_URL
+  description: "AAP Controller URL"
+  required: true
+- name: VSCODE_PASSWORD
+  description: "VSCode server password"
+  generate: expression
+  from: "[a-zA-Z0-9]{12}"
+objects:
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vscode-user${USER_NUMBER}-storage
+  namespace: workshop-vscode
+  labels:
+    workshop.component: "vscode-server"
+    workshop.user: "user${USER_NUMBER}"
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: gp3-csi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vscode-user${USER_NUMBER}-env
+  namespace: workshop-vscode
+  labels:
+    workshop.component: "vscode-server"
+    workshop.user: "user${USER_NUMBER}"
+type: Opaque
+stringData:
+  PASSWORD: "${VSCODE_PASSWORD}"
+  USER_NUMBER: "${USER_NUMBER}"
+  USER_EMAIL: "${USER_EMAIL}"
+  WORKSHOP_GUID: "${WORKSHOP_GUID}"
+  OCP_CLUSTER_DOMAIN: "${OCP_CLUSTER_DOMAIN}"
+  AAP_URL: "${AAP_URL}"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vscode-user${USER_NUMBER}
+  namespace: workshop-vscode
+  labels:
+    workshop.component: "vscode-server"
+    workshop.user: "user${USER_NUMBER}"
+    app: vscode-user${USER_NUMBER}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vscode-user${USER_NUMBER}
+  template:
+    metadata:
+      labels:
+        app: vscode-user${USER_NUMBER}
+        workshop.component: "vscode-server"
+        workshop.user: "user${USER_NUMBER}"
+    spec:
+      serviceAccountName: vscode-server
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: vscode-server
+        image: codercom/code-server:4.20.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        env:
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: vscode-user${USER_NUMBER}-env
+              key: PASSWORD
+        - name: USER_NUMBER
+          valueFrom:
+            secretKeyRef:
+              name: vscode-user${USER_NUMBER}-env
+              key: USER_NUMBER
+        - name: USER_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: vscode-user${USER_NUMBER}-env
+              key: USER_EMAIL
+        - name: WORKSHOP_GUID
+          valueFrom:
+            secretKeyRef:
+              name: vscode-user${USER_NUMBER}-env
+              key: WORKSHOP_GUID
+        - name: OCP_CLUSTER_DOMAIN
+          valueFrom:
+            secretKeyRef:
+              name: vscode-user${USER_NUMBER}-env
+              key: OCP_CLUSTER_DOMAIN
+        - name: AAP_URL
+          valueFrom:
+            secretKeyRef:
+              name: vscode-user${USER_NUMBER}-env
+              key: AAP_URL
+        args:
+        - "--bind-addr"
+        - "0.0.0.0:8080"
+        - "--auth"
+        - "password"
+        - "--disable-telemetry"
+        - "--disable-update-check"
+        - "/workspace"
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        volumeMounts:
+        - name: workspace-storage
+          mountPath: /workspace
+        - name: vscode-config
+          mountPath: /home/coder/.local/share/code-server/User/settings.json
+          subPath: settings.json
+        - name: vscode-config
+          mountPath: /workspace/.vscode/extensions.json
+          subPath: extensions.json
+        - name: vscode-config
+          mountPath: /workspace/workshop.code-workspace
+          subPath: workspace.code-workspace
+        - name: ansible-config
+          mountPath: /workspace/ansible.cfg
+          subPath: ansible.cfg
+        - name: ansible-config
+          mountPath: /workspace/requirements.yml
+          subPath: requirements.yml
+        - name: ansible-config
+          mountPath: /workspace/requirements.txt
+          subPath: requirements.txt
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+      initContainers:
+      - name: setup-workspace
+        image: registry.redhat.io/ubi8/python-39:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "Setting up workspace for user ${USER_NUMBER}..."
+          
+          # Create directory structure
+          mkdir -p /workspace/{playbooks,roles,inventory,docs,logs}
+          mkdir -p /workspace/.vscode
+          
+          # Copy workshop content if it doesn't exist
+          if [ ! -f "/workspace/README.md" ]; then
+            cat > /workspace/README.md << 'EOF'
+          # AAP Workshop - User ${USER_NUMBER}
+          
+          Welcome to the Advanced Ansible Automation Platform Workshop!
+          
+          ## Workshop Environment
+          - **User**: ${USER_EMAIL}
+          - **GUID**: ${WORKSHOP_GUID}
+          - **AAP Controller**: ${AAP_URL}
+          
+          ## Getting Started
+          1. Open the terminal (Terminal → New Terminal)
+          2. Install Ansible collections: `ansible-galaxy collection install -r requirements.yml`
+          3. Install Python requirements: `pip install -r requirements.txt`
+          4. Start with Module 1 exercises in the `playbooks/` directory
+          
+          ## Workshop Structure
+          - `playbooks/` - Ansible playbooks for exercises
+          - `roles/` - Reusable Ansible roles
+          - `inventory/` - Inventory configurations
+          - `docs/` - Workshop documentation
+          
+          ## Useful Commands
+          - Test OpenShift connection: `oc whoami`
+          - Test AAP connection: `curl -k ${AAP_URL}/api/v2/ping/`
+          - Run ansible-lint: `ansible-lint playbooks/`
+          
+          Happy learning!
+          EOF
+          fi
+          
+          # Set proper ownership
+          chown -R 1000:1000 /workspace
+          chmod -R 755 /workspace
+          
+          echo "Workspace setup complete!"
+        env:
+        - name: USER_NUMBER
+          valueFrom:
+            secretKeyRef:
+              name: vscode-user${USER_NUMBER}-env
+              key: USER_NUMBER
+        - name: USER_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: vscode-user${USER_NUMBER}-env
+              key: USER_EMAIL
+        - name: WORKSHOP_GUID
+          valueFrom:
+            secretKeyRef:
+              name: vscode-user${USER_NUMBER}-env
+              key: WORKSHOP_GUID
+        - name: AAP_URL
+          valueFrom:
+            secretKeyRef:
+              name: vscode-user${USER_NUMBER}-env
+              key: AAP_URL
+        volumeMounts:
+        - name: workspace-storage
+          mountPath: /workspace
+      volumes:
+      - name: workspace-storage
+        persistentVolumeClaim:
+          claimName: vscode-user${USER_NUMBER}-storage
+      - name: vscode-config
+        configMap:
+          name: vscode-workshop-config
+          items:
+          - key: settings.json
+            path: settings.json
+          - key: extensions.json
+            path: extensions.json
+          - key: workspace.code-workspace
+            path: workspace.code-workspace
+      - name: ansible-config
+        configMap:
+          name: vscode-workshop-config
+          items:
+          - key: ansible.cfg
+            path: ansible.cfg
+          - key: requirements.yml
+            path: requirements.yml
+          - key: requirements.txt
+            path: requirements.txt
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vscode-user${USER_NUMBER}
+  namespace: workshop-vscode
+  labels:
+    workshop.component: "vscode-server"
+    workshop.user: "user${USER_NUMBER}"
+    app: vscode-user${USER_NUMBER}
+spec:
+  ports:
+  - name: http
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: vscode-user${USER_NUMBER}
+  type: ClusterIP
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: vscode-user${USER_NUMBER}
+  namespace: workshop-vscode
+  labels:
+    workshop.component: "vscode-server"
+    workshop.user: "user${USER_NUMBER}"
+  annotations:
+    haproxy.router.openshift.io/timeout: "300s"
+spec:
+  host: vscode-user${USER_NUMBER}.${OCP_CLUSTER_DOMAIN}
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  to:
+    kind: Service
+    name: vscode-user${USER_NUMBER}
+    weight: 100
+  wildcardPolicy: None
