@@ -46,6 +46,13 @@ parse_details() {
     local ssh_port=$(grep "ssh lab-user@" "${DETAILS_FILE}" | head -1 | sed 's/.*-p //')
     local ssh_password=$(grep "ssh password when prompted:" "${DETAILS_FILE}" | sed 's/.*ssh password when prompted: //')
     
+    # Extract OpenShift bearer token if present
+    local bearer_token=$(grep -E "(Bearer Token|Service Account Token):" "${DETAILS_FILE}" | sed 's/.*Token: //' | head -1)
+    if [[ -z "${bearer_token}" ]]; then
+        # Try alternative patterns for bearer token
+        bearer_token=$(grep -E "(oc login.*--token=|--token)" "${DETAILS_FILE}" | sed 's/.*--token[= ]//' | awk '{print $1}' | head -1)
+    fi
+    
     # Write environment variables to .env file
     cat > "${ENV_FILE}" << EOF
 # Workshop Environment Configuration
@@ -58,6 +65,7 @@ AWS_SECRET_ACCESS_KEY=${aws_secret}
 # OpenShift Configuration
 OCP_CONSOLE_URL=${console_url}
 OCP_API_URL=${api_url}
+OCP_BEARER_TOKEN=${bearer_token}
 ROUTE53_DOMAIN=${domain}
 
 # Automation Controller Configuration
@@ -80,11 +88,22 @@ configure_oc_login() {
     
     source "${ENV_FILE}"
     
-    # Note: In a real workshop, participants would use proper authentication
-    # This assumes service account tokens or other auth methods are configured
-    log "Please ensure you are logged into OpenShift cluster:"
-    log "  oc login ${OCP_API_URL}"
-    log "You may need to use a service account token or other authentication method"
+    if [[ -n "${OCP_BEARER_TOKEN}" ]]; then
+        log "Logging into OpenShift using bearer token..."
+        if oc login "${OCP_API_URL}" --token="${OCP_BEARER_TOKEN}" --insecure-skip-tls-verify=true; then
+            log "Successfully logged into OpenShift cluster"
+            log "Current user: $(oc whoami)"
+            log "Current project: $(oc project -q)"
+        else
+            log "WARNING: Failed to login with bearer token"
+            log "Please manually login: oc login ${OCP_API_URL}"
+        fi
+    else
+        log "No bearer token found in details.txt"
+        log "Please manually login to OpenShift cluster:"
+        log "  oc login ${OCP_API_URL}"
+        log "You may need to use a service account token or other authentication method"
+    fi
 }
 
 create_namespace() {

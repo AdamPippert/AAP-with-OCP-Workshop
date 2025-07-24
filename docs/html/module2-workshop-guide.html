@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Module 2: Idempotent Resource Management and RBAC - Workshop Guide</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+            background-color: #fafafa;
+        }
+        .container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #e74c3c;
+            border-bottom: 3px solid #e74c3c;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+            margin-top: 40px;
+        }
+        h3 {
+            color: #2980b9;
+            margin-top: 30px;
+        }
+        h4 {
+            color: #27ae60;
+            margin-top: 25px;
+        }
+        .overview {
+            background-color: #ecf0f1;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .time-allocation {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .learning-objectives {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .checkpoint {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .troubleshooting {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .permission-matrix {
+            background-color: #e2e3e5;
+            border: 1px solid #d6d8db;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #ecf0f1;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        ul, ol {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+        li {
+            margin: 8px 0;
+        }
+        .checklist {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .checklist li {
+            padding: 8px 0;
+        }
+        .checklist li:before {
+            content: "☐ ";
+            color: #3498db;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .success-item:before {
+            content: "✅ ";
+            color: #27ae60;
+        }
+        .fail-item:before {
+            content: "❌ ";
+            color: #e74c3c;
+        }
+        .nav-section {
+            background-color: #34495e;
+            color: white;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 6px;
+        }
+        .nav-section h3 {
+            color: #ecf0f1;
+            margin-top: 0;
+        }
+        hr {
+            border: none;
+            height: 2px;
+            background-color: #bdc3c7;
+            margin: 40px 0;
+        }
+        .emoji {
+            font-size: 1.2em;
+        }
+        .key-concepts {
+            background-color: #f8f9fa;
+            border-left: 4px solid #6f42c1;
+            padding: 15px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Module 2: Idempotent Resource Management and RBAC - Workshop Guide</h1>
+
+        <div class="overview">
+            <h2>Overview</h2>
+            <p><strong>Duration:</strong> 45 minutes<br>
+            <strong>Objective:</strong> Master production-ready resource management patterns using the <code>redhat.openshift</code> collection with comprehensive RBAC automation and rollback capabilities</p>
+            
+            <p>In this module, you'll progress from basic resource deployment to enterprise-grade idempotent patterns, automated service account provisioning, and robust error handling for IMS workloads in OpenShift environments.</p>
+        </div>
+
+        <h2>Prerequisites</h2>
+        <p>Before starting this module, ensure you have:</p>
+        <ul class="checklist">
+            <li>Completed Module 1 with working dynamic inventory</li>
+            <li>OpenShift cluster access with cluster-admin permissions</li>
+            <li><code>redhat.openshift</code> collection installed (<code>ansible-galaxy collection install redhat.openshift</code>)</li>
+            <li><code>kubernetes.core</code> collection available from Module 1</li>
+            <li>Understanding of RBAC concepts and security context constraints</li>
+        </ul>
+
+        <h3>Quick Environment Check</h3>
+        <pre><code class="language-bash"># Verify redhat.openshift collection
+ansible-galaxy collection list | grep redhat.openshift
+
+# Check cluster-admin permissions
+oc auth can-i create clusterroles
+oc auth can-i create securitycontextconstraints
+
+# Verify namespace creation permissions
+oc auth can-i create namespaces
+
+# Test Module 1 inventory is still working
+ansible-inventory -i inventory/exercise1-2-multi-cluster.yml --list | jq 'keys[]' | head -5</code></pre>
+
+        <h2>Module Structure</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Exercise</th>
+                    <th>Duration</th>
+                    <th>Focus Area</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>2.1</td>
+                    <td>15 min</td>
+                    <td>Idempotent Resource Deployment</td>
+                </tr>
+                <tr>
+                    <td>2.2</td>
+                    <td>15 min</td>
+                    <td>Automated RBAC Provisioning</td>
+                </tr>
+                <tr>
+                    <td>2.3</td>
+                    <td>10 min</td>
+                    <td>Error Handling and Rollback Mechanisms</td>
+                </tr>
+                <tr>
+                    <td>2.4</td>
+                    <td>5 min</td>
+                    <td>IMS-Specific Configuration and Validation</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <hr>
+
+        <h2>Exercise 2.1: Idempotent Resource Deployment</h2>
+        
+        <div class="time-allocation">
+            <strong>⏱️ Time Allocation:</strong> 15 minutes (10 min hands-on, 5 min validation)
+        </div>
+
+        <div class="learning-objectives">
+            <h3>Learning Objectives</h3>
+            <ul>
+                <li>Implement truly idempotent deployment patterns using <code>redhat.openshift.k8s</code></li>
+                <li>Create environment-aware resource management with conditional changes</li>
+                <li>Build deployment verification and state management capabilities</li>
+            </ul>
+        </div>
+
+        <h3>Step-by-Step Instructions</h3>
+
+        <h4>Step 1: Review the Idempotent Deployment Configuration (3 minutes)</h4>
+        <pre><code class="language-bash"># Examine the idempotent deployment playbook
+cat playbooks/module2/exercise2-1-idempotent-deployment.yml
+
+# Review the IMS deployment role structure
+ls -la roles/ims_deployment/</code></pre>
+
+        <div class="key-concepts">
+            <p><strong>Key Idempotency Concepts:</strong></p>
+            <ul>
+                <li><code>state: present</code> - Ensures resources exist with desired configuration</li>
+                <li><code>wait: true</code> and <code>wait_condition</code> - Validates deployment success before continuing</li>
+                <li><code>definition</code> blocks - Declare desired state rather than imperative commands</li>
+                <li>Resource comparison - Only updates when actual state differs from desired state</li>
+            </ul>
+        </div>
+
+        <h4>Step 2: Deploy IMS Services Idempotently (7 minutes)</h4>
+        <pre><code class="language-bash"># Run the idempotent deployment for development environment
+ansible-playbook playbooks/module2/exercise2-1-idempotent-deployment.yml \
+  -e target_env=dev \
+  -e ims_version=1.0.0
+
+# Run the same playbook again to test idempotency
+ansible-playbook playbooks/module2/exercise2-1-idempotent-deployment.yml \
+  -e target_env=dev \
+  -e ims_version=1.0.0
+
+# Check deployment status
+oc get deployment -n ims-dev ims-connector -o wide</code></pre>
+
+        <h4>Step 3: Test Configuration Changes and Updates (5 minutes)</h4>
+        <pre><code class="language-bash"># Update to a new version to test rolling updates
+ansible-playbook playbooks/module2/exercise2-1-idempotent-deployment.yml \
+  -e target_env=dev \
+  -e ims_version=1.1.0
+
+# Verify the update was applied correctly
+oc describe deployment -n ims-dev ims-connector | grep "Image:"
+
+# Scale the deployment and verify idempotency
+ansible-playbook playbooks/module2/exercise2-1-idempotent-deployment.yml \
+  -e target_env=dev \
+  -e ims_version=1.1.0 \
+  -e ims_replicas=3</code></pre>
+
+        <h4>Step 4: Validation Checkpoint (5 minutes)</h4>
+        <div class="checkpoint">
+            <p><strong>Expected Results:</strong></p>
+            <ul>
+                <li class="success-item">First playbook run creates all resources successfully</li>
+                <li class="success-item">Second identical run reports no changes (idempotent behavior)</li>
+                <li class="success-item">Version update triggers rolling deployment without errors</li>
+                <li class="success-item">Scaling changes are applied correctly and reported</li>
+            </ul>
+        </div>
+
+        <div class="troubleshooting">
+            <p><strong>Troubleshooting Common Issues:</strong></p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Issue</th>
+                        <th>Symptoms</th>
+                        <th>Solution</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Resources not created</td>
+                        <td>"Failed to create resource"</td>
+                        <td>Check RBAC permissions: <code>oc auth can-i create deployments</code></td>
+                    </tr>
+                    <tr>
+                        <td>Updates not applied</td>
+                        <td>No changes on version update</td>
+                        <td>Verify resource comparison logic in playbook</td>
+                    </tr>
+                    <tr>
+                        <td>Deployment stuck</td>
+                        <td>Pods not ready after wait timeout</td>
+                        <td>Check resource limits and image availability</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <hr>
+
+        <h2>Exercise 2.2: Automated RBAC Provisioning</h2>
+        
+        <div class="time-allocation">
+            <strong>⏱️ Time Allocation:</strong> 15 minutes (10 min configuration, 5 min testing)
+        </div>
+
+        <div class="learning-objectives">
+            <h3>Learning Objectives</h3>
+            <ul>
+                <li>Automate service account provisioning with least-privilege access</li>
+                <li>Implement security context constraints for IMS workloads</li>
+                <li>Create environment-specific RBAC patterns</li>
+            </ul>
+        </div>
+
+        <h3>Step-by-Step Instructions</h3>
+
+        <h4>Step 1: Review RBAC Automation Structure (3 minutes)</h4>
+        <pre><code class="language-bash"># Examine the RBAC automation playbook
+cat playbooks/module2/exercise2-2-rbac-automation.yml
+
+# Review the RBAC role templates
+ls -la roles/ims_rbac/tasks/
+cat roles/ims_rbac/tasks/main.yml</code></pre>
+
+        <div class="key-concepts">
+            <p><strong>Key RBAC Components:</strong></p>
+            <ul>
+                <li><strong>ServiceAccount</strong> - Identity for IMS applications</li>
+                <li><strong>ClusterRole</strong> - Permissions for cross-namespace operations</li>
+                <li><strong>ClusterRoleBinding</strong> - Links service accounts to cluster roles</li>
+                <li><strong>SecurityContextConstraints</strong> - OpenShift-specific security policies</li>
+            </ul>
+        </div>
+
+        <h4>Step 2: Execute RBAC Provisioning (7 minutes)</h4>
+        <pre><code class="language-bash"># Run RBAC automation for development environment
+ansible-playbook playbooks/module2/exercise2-2-rbac-automation.yml \
+  -e target_env=dev
+
+# Verify service account creation
+oc get serviceaccount -n ims-dev ims-operator
+
+# Check cluster role and bindings
+oc get clusterrole ims-operator
+oc get clusterrolebinding | grep ims-operator
+
+# Verify security context constraints
+oc get scc ims-scc -o yaml</code></pre>
+
+        <h4>Step 3: Test Service Account Permissions (5 minutes)</h4>
+        <pre><code class="language-bash"># Test service account can create required resources
+oc auth can-i create pods --as=system:serviceaccount:ims-dev:ims-operator
+oc auth can-i create services --as=system:serviceaccount:ims-dev:ims-operator
+oc auth can-i create networkpolicies --as=system:serviceaccount:ims-dev:ims-operator
+
+# Test restricted permissions (should be denied)
+oc auth can-i create clusterroles --as=system:serviceaccount:ims-dev:ims-operator
+oc auth can-i delete nodes --as=system:serviceaccount:ims-dev:ims-operator</code></pre>
+
+        <div class="permission-matrix">
+            <p><strong>Expected Permission Matrix:</strong></p>
+            <ul>
+                <li class="success-item">Create/manage pods, services, configmaps, secrets in IMS namespaces</li>
+                <li class="success-item">Create/manage deployments and replicasets</li>
+                <li class="success-item">Create/manage network policies</li>
+                <li class="fail-item">Create cluster-level resources (except those explicitly granted)</li>
+                <li class="fail-item">Access system namespaces or privileged operations</li>
+            </ul>
+        </div>
+
+        <hr>
+
+        <h2>Exercise 2.3: Error Handling and Rollback Mechanisms</h2>
+        
+        <div class="time-allocation">
+            <strong>⏱️ Time Allocation:</strong> 10 minutes (6 min implementation, 4 min testing)
+        </div>
+
+        <div class="learning-objectives">
+            <h3>Learning Objectives</h3>
+            <ul>
+                <li>Implement production-grade error handling with <code>block-rescue-always</code> patterns</li>
+                <li>Create automatic rollback capabilities for failed deployments</li>
+                <li>Build comprehensive deployment validation and health checking</li>
+            </ul>
+        </div>
+
+        <h3>Step-by-Step Instructions</h3>
+
+        <h4>Step 1: Review Error Handling Patterns (2 minutes)</h4>
+        <pre><code class="language-bash"># Examine the rollback patterns playbook
+cat playbooks/module2/exercise2-3-rollback-patterns.yml
+
+# Review the validation tasks
+grep -A 20 "Validate deployment health" playbooks/module2/exercise2-3-rollback-patterns.yml</code></pre>
+
+        <h4>Step 2: Test Successful Deployment with Error Handling (4 minutes)</h4>
+        <pre><code class="language-bash"># Run deployment with comprehensive error handling
+ansible-playbook playbooks/module2/exercise2-3-rollback-patterns.yml \
+  -e target_env=dev \
+  -e ims_version=1.2.0
+
+# Check the deployment logs for error handling execution
+tail -20 /tmp/ims-deployment-dev.log</code></pre>
+
+        <h4>Step 3: Simulate and Test Failure Scenarios (4 minutes)</h4>
+        <pre><code class="language-bash"># Test rollback with intentionally broken image
+ansible-playbook playbooks/module2/exercise2-3-rollback-patterns.yml \
+  -e target_env=dev \
+  -e ims_version=broken-tag \
+  -e ims_image_repo=nonexistent-registry.com/ims/connector
+
+# Verify rollback occurred
+oc get deployment -n ims-dev ims-connector -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+# Check rollback logs
+tail -30 /tmp/ims-deployment-dev.log</code></pre>
+
+        <div class="checkpoint">
+            <p><strong>Expected Behavior:</strong></p>
+            <ul>
+                <li class="success-item">Successful deployments complete without triggering rescue blocks</li>
+                <li class="success-item">Failed deployments automatically rollback to previous working state</li>
+                <li class="success-item">Health checks validate deployment success before marking complete</li>
+                <li class="success-item">Comprehensive logging captures all deployment attempts</li>
+            </ul>
+        </div>
+
+        <hr>
+
+        <h2>Exercise 2.4: IMS-Specific Configuration and Validation</h2>
+        
+        <div class="time-allocation">
+            <strong>⏱️ Time Allocation:</strong> 5 minutes
+        </div>
+
+        <div class="learning-objectives">
+            <h3>Learning Objectives</h3>
+            <ul>
+                <li>Apply enterprise patterns to realistic IMS deployment scenarios</li>
+                <li>Configure mainframe connectivity and security requirements</li>
+                <li>Validate complete end-to-end IMS environment</li>
+            </ul>
+        </div>
+
+        <h3>Step-by-Step Instructions</h3>
+
+        <h4>Step 1: Deploy Complete IMS Configuration (3 minutes)</h4>
+        <pre><code class="language-bash"># Run the comprehensive validation playbook
+ansible-playbook playbooks/module2/exercise2-4-validation.yml \
+  -e target_env=dev
+
+# Verify all IMS components are running
+oc get all -n ims-dev -l app.kubernetes.io/name=ims-environment</code></pre>
+
+        <h4>Step 2: Validate IMS Environment (2 minutes)</h4>
+        <pre><code class="language-bash"># Test IMS service endpoints
+oc port-forward -n ims-dev service/ims-connector 8080:8080 &
+curl -s http://localhost:8080/health | jq
+
+# Check IMS-specific network policies
+oc get networkpolicy -n ims-dev ims-mainframe-access -o yaml
+
+# Verify persistent storage configuration
+oc get pvc -n ims-dev</code></pre>
+
+        <hr>
+
+        <h2>Module 2 Validation Checkpoints</h2>
+        <p>Complete these validation steps to confirm your learning:</p>
+
+        <div class="checkpoint">
+            <h3>✅ Checkpoint 1: Idempotent Deployment</h3>
+            <pre><code class="language-bash"># This should show no changes on repeated execution
+ansible-playbook playbooks/module2/exercise2-1-idempotent-deployment.yml \
+  -e target_env=dev -e ims_version=1.2.0 | grep "changed=0"</code></pre>
+        </div>
+
+        <div class="checkpoint">
+            <h3>✅ Checkpoint 2: RBAC Automation</h3>
+            <pre><code class="language-bash"># This should return "yes" for required permissions
+oc auth can-i create deployments --as=system:serviceaccount:ims-dev:ims-operator</code></pre>
+        </div>
+
+        <div class="checkpoint">
+            <h3>✅ Checkpoint 3: Error Handling</h3>
+            <pre><code class="language-bash"># This should show successful rollback logs
+grep -i "rollback" /tmp/ims-deployment-dev.log</code></pre>
+        </div>
+
+        <div class="checkpoint">
+            <h3>✅ Checkpoint 4: Complete IMS Environment</h3>
+            <pre><code class="language-bash"># This should show healthy IMS services
+oc get deployment -n ims-dev ims-connector -o jsonpath='{.status.readyReplicas}'</code></pre>
+        </div>
+
+        <h2>Common Issues and Solutions</h2>
+
+        <div class="troubleshooting">
+            <h3>Issue 1: "Forbidden: User cannot create ClusterRole"</h3>
+            <p><strong>Symptoms:</strong> Permission denied errors during RBAC creation</p>
+            <p><strong>Diagnosis:</strong></p>
+            <pre><code class="language-bash">oc auth can-i create clusterroles
+oc whoami</code></pre>
+            <p><strong>Solution:</strong> Ensure your user has cluster-admin permissions or appropriate RBAC roles</p>
+        </div>
+
+        <div class="troubleshooting">
+            <h3>Issue 2: "SecurityContextConstraints admission denied"</h3>
+            <p><strong>Symptoms:</strong> Pods fail to start with security policy violations</p>
+            <p><strong>Diagnosis:</strong></p>
+            <pre><code class="language-bash">oc get events -n ims-dev | grep -i security
+oc describe pod &lt;pod-name&gt; -n ims-dev</code></pre>
+            <p><strong>Solution:</strong> Verify SCC is properly created and service account is authorized</p>
+        </div>
+
+        <div class="troubleshooting">
+            <h3>Issue 3: "Deployment rollout stuck"</h3>
+            <p><strong>Symptoms:</strong> Deployments remain in "Progressing" state</p>
+            <p><strong>Diagnosis:</strong></p>
+            <pre><code class="language-bash">oc rollout status deployment/ims-connector -n ims-dev
+oc get pods -n ims-dev -l app=ims-connector</code></pre>
+            <p><strong>Solution:</strong> Check resource quotas, image availability, and health check configurations</p>
+        </div>
+
+        <div class="troubleshooting">
+            <h3>Issue 4: "Rollback failed to restore previous state"</h3>
+            <p><strong>Symptoms:</strong> Error handling doesn't properly restore working deployment</p>
+            <p><strong>Solution:</strong></p>
+            <ul>
+                <li>Ensure deployment state is captured before changes</li>
+                <li>Verify <code>current_deployment.resources</code> contains valid previous state</li>
+                <li>Check that rollback deployment definition is complete</li>
+            </ul>
+        </div>
+
+        <h2>Module 2 Completion Checklist</h2>
+        <p>Before proceeding to Module 3, ensure you can:</p>
+        <ul class="checklist">
+            <li>Deploy OpenShift resources idempotently with no changes on repeated runs</li>
+            <li>Create and manage service accounts with appropriate RBAC permissions</li>
+            <li>Implement security context constraints for IMS workloads</li>
+            <li>Handle deployment failures with automatic rollback capabilities</li>
+            <li>Configure IMS-specific networking and storage requirements</li>
+            <li>Validate deployment health and connectivity systematically</li>
+        </ul>
+
+        <div class="nav-section">
+            <h2>Next Steps</h2>
+            <h3><span class="emoji">🚀</span> Ready for Module 3?</h3>
+            <p>Module 2 has established your production-ready deployment foundation. In Module 3, you'll enhance these capabilities with:</p>
+            <ul>
+                <li>Advanced Jinja2 templating for complex environment configurations</li>
+                <li>Sophisticated error handling with circuit breaker patterns</li>
+                <li>Automated testing using the Molecule framework</li>
+                <li>Advanced troubleshooting techniques for production environments</li>
+            </ul>
+            <p><strong>Estimated prep time for Module 3:</strong> 5 minutes to review Jinja2 templating concepts</p>
+        </div>
+
+        <h2>Additional Resources</h2>
+
+        <h3>Quick Reference Commands</h3>
+        <pre><code class="language-bash"># Test resource idempotency
+ansible-playbook &lt;playbook&gt; --check --diff
+
+# Validate RBAC permissions
+oc auth can-i &lt;verb&gt; &lt;resource&gt; --as=system:serviceaccount:&lt;namespace&gt;:&lt;sa-name&gt;
+
+# Debug deployment issues
+oc rollout history deployment/&lt;name&gt; -n &lt;namespace&gt;
+oc rollout undo deployment/&lt;name&gt; -n &lt;namespace&gt;
+
+# Monitor resource events
+oc get events -n &lt;namespace&gt; --sort-by=.metadata.creationTimestamp</code></pre>
+
+        <h3>Production Deployment Patterns</h3>
+        <p>See the <code>roles/ims_deployment/</code> and <code>roles/ims_rbac/</code> directories for reusable automation patterns suitable for enterprise environments.</p>
+
+        <hr>
+
+        <div class="nav-section">
+            <p><strong><span class="emoji">⚡</span> Module 2 Complete!</strong> You now have enterprise-grade deployment capabilities with comprehensive RBAC and error handling. Ready to add advanced automation in Module 3!</p>
+        </div>
+    </div>
+</body>
+</html>

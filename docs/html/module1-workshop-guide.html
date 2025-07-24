@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Module 1: Dynamic Inventory and AAP Integration - Workshop Guide</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+            background-color: #fafafa;
+        }
+        .container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #e74c3c;
+            border-bottom: 3px solid #e74c3c;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+            margin-top: 40px;
+        }
+        h3 {
+            color: #2980b9;
+            margin-top: 30px;
+        }
+        h4 {
+            color: #27ae60;
+            margin-top: 25px;
+        }
+        .overview {
+            background-color: #ecf0f1;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .time-allocation {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .learning-objectives {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .checkpoint {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .troubleshooting {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #ecf0f1;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        ul, ol {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+        li {
+            margin: 8px 0;
+        }
+        .checklist {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .checklist li {
+            padding: 8px 0;
+        }
+        .checklist li:before {
+            content: "☐ ";
+            color: #3498db;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .success-item:before {
+            content: "✅ ";
+            color: #27ae60;
+        }
+        .fail-item:before {
+            content: "❌ ";
+            color: #e74c3c;
+        }
+        .nav-section {
+            background-color: #34495e;
+            color: white;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 6px;
+        }
+        .nav-section h3 {
+            color: #ecf0f1;
+            margin-top: 0;
+        }
+        hr {
+            border: none;
+            height: 2px;
+            background-color: #bdc3c7;
+            margin: 40px 0;
+        }
+        .emoji {
+            font-size: 1.2em;
+        }
+        .config-note {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .config-note:before {
+            content: "🔧 ";
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Module 1: Dynamic Inventory and AAP Integration - Workshop Guide</h1>
+
+        <div class="overview">
+            <h2>Overview</h2>
+            <p><strong>Duration:</strong> 40 minutes<br>
+            <strong>Objective:</strong> Master advanced inventory management patterns for multi-cluster OpenShift environments</p>
+            
+            <p>In this module, you'll progress from basic single-cluster inventory discovery to advanced event-driven inventory synchronization, building the foundation for all subsequent workshop activities.</p>
+        </div>
+
+        <h2>Prerequisites</h2>
+        <p>Before starting this module, ensure you have:</p>
+        <ul class="checklist">
+            <li>OpenShift cluster access with valid kubeconfig</li>
+            <li>Ansible Automation Platform 2.5 access</li>
+            <li><code>kubernetes.core</code> collection installed (<code>ansible-galaxy collection install kubernetes.core</code>)</li>
+            <li>Basic understanding of Ansible inventory concepts</li>
+            <li><code>kubectl</code> or <code>oc</code> CLI tools configured</li>
+        </ul>
+
+        <h3>Quick Environment Check</h3>
+        <pre><code class="language-bash"># Verify cluster connectivity
+kubectl get nodes
+
+# Check your current context
+kubectl config current-context
+
+# Verify Ansible collections
+ansible-galaxy collection list | grep kubernetes.core
+
+# Test basic OpenShift API access
+kubectl get pods --all-namespaces | head -5</code></pre>
+
+        <h2>Module Structure</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Exercise</th>
+                    <th>Duration</th>
+                    <th>Focus Area</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1.1</td>
+                    <td>10 min</td>
+                    <td>Single-Cluster Dynamic Inventory</td>
+                </tr>
+                <tr>
+                    <td>1.2</td>
+                    <td>15 min</td>
+                    <td>Multi-Cluster Inventory Configuration</td>
+                </tr>
+                <tr>
+                    <td>1.3</td>
+                    <td>10 min</td>
+                    <td>Event-Driven Inventory Updates</td>
+                </tr>
+                <tr>
+                    <td>1.4</td>
+                    <td>5 min</td>
+                    <td>Troubleshooting and Optimization</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <hr>
+
+        <h2>Exercise 1.1: Single-Cluster Dynamic Inventory</h2>
+        
+        <div class="time-allocation">
+            <strong>⏱️ Time Allocation:</strong> 10 minutes (5 min hands-on, 5 min validation)
+        </div>
+
+        <div class="learning-objectives">
+            <h3>Learning Objectives</h3>
+            <ul>
+                <li>Configure basic OpenShift service discovery using <code>kubernetes.core.k8s</code></li>
+                <li>Implement namespace-based and application-based grouping</li>
+                <li>Test inventory discovery and validate results</li>
+            </ul>
+        </div>
+
+        <h3>Step-by-Step Instructions</h3>
+
+        <h4>Step 1: Review the Inventory Configuration (2 minutes)</h4>
+        <pre><code class="language-bash"># Examine the single-cluster inventory file
+cat inventory/exercise1-1-single-cluster.yml</code></pre>
+
+        <p><strong>Key Configuration Points:</strong></p>
+        <ul>
+            <li><code>plugin: kubernetes.core.k8s</code> - Uses the Kubernetes dynamic inventory plugin</li>
+            <li><code>connections</code> - Defines which cluster context to use</li>
+            <li><code>compose</code> - Creates host variables from pod metadata</li>
+            <li><code>keyed_groups</code> - Creates dynamic groups based on pod properties</li>
+            <li><code>filters</code> - Excludes system pods and non-running pods</li>
+        </ul>
+
+        <h4>Step 2: Test the Inventory Configuration (3 minutes)</h4>
+        <pre><code class="language-bash"># Run the validation playbook
+ansible-playbook playbooks/module1/exercise1-1-test-inventory.yml
+
+# Manually test inventory discovery
+ansible-inventory -i inventory/exercise1-1-single-cluster.yml --list
+
+# View inventory structure
+ansible-inventory -i inventory/exercise1-1-single-cluster.yml --graph</code></pre>
+
+        <h4>Step 3: Validation Checkpoint (5 minutes)</h4>
+        <div class="checkpoint">
+            <p><strong>Expected Results:</strong></p>
+            <ul>
+                <li class="success-item">Playbook completes successfully</li>
+                <li class="success-item">Test pods are created and discovered</li>
+                <li class="success-item">Dynamic groups are created (namespace_*, app_*, node_*)</li>
+                <li class="success-item">Pod IPs are properly assigned as ansible_host values</li>
+            </ul>
+        </div>
+
+        <div class="troubleshooting">
+            <p><strong>Troubleshooting Common Issues:</strong></p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Issue</th>
+                        <th>Symptoms</th>
+                        <th>Solution</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>No pods discovered</td>
+                        <td>Empty inventory output</td>
+                        <td>Check cluster connectivity: <code>kubectl get pods</code></td>
+                    </tr>
+                    <tr>
+                        <td>Permission denied</td>
+                        <td>403 Forbidden errors</td>
+                        <td>Verify RBAC: <code>kubectl auth can-i get pods</code></td>
+                    </tr>
+                    <tr>
+                        <td>Wrong context</td>
+                        <td>Connection refused</td>
+                        <td>Check context: <code>kubectl config current-context</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <hr>
+
+        <h2>Exercise 1.2: Multi-Cluster Inventory Configuration</h2>
+        
+        <div class="time-allocation">
+            <strong>⏱️ Time Allocation:</strong> 15 minutes (10 min configuration, 5 min testing)
+        </div>
+
+        <div class="learning-objectives">
+            <h3>Learning Objectives</h3>
+            <ul>
+                <li>Configure inventory for multiple OpenShift clusters</li>
+                <li>Implement cross-cluster resource discovery</li>
+                <li>Create environment-specific grouping strategies</li>
+            </ul>
+        </div>
+
+        <h3>Step-by-Step Instructions</h3>
+
+        <h4>Step 1: Update Cluster Contexts (3 minutes)</h4>
+        <pre><code class="language-bash"># Check available contexts
+kubectl config get-contexts
+
+# Update inventory file with your actual context names
+# Edit inventory/exercise1-2-multi-cluster.yml
+# Replace cluster-dev, cluster-test, cluster-prod with your contexts</code></pre>
+
+        <div class="config-note">
+            <strong>Configuration Note:</strong> If you only have one cluster, you can simulate multiple clusters by creating multiple namespaces (e.g., <code>ims-dev</code>, <code>ims-test</code>, <code>ims-prod</code>) and using the same context for all connections.
+        </div>
+
+        <h4>Step 2: Run Multi-Cluster Discovery (7 minutes)</h4>
+        <pre><code class="language-bash"># Execute the multi-cluster test playbook
+ansible-playbook playbooks/module1/exercise1-2-test-multi-cluster.yml
+
+# Examine the multi-cluster inventory structure
+ansible-inventory -i inventory/exercise1-2-multi-cluster.yml --graph
+
+# View full inventory data
+ansible-inventory -i inventory/exercise1-2-multi-cluster.yml --list | jq</code></pre>
+
+        <h4>Step 3: Analyze Cross-Cluster Grouping (5 minutes)</h4>
+        <p><strong>Expected Group Types:</strong></p>
+        <ul>
+            <li><code>cluster_*</code> - Groups pods by cluster context</li>
+            <li><code>env_*</code> - Groups pods by environment (development/testing/production)</li>
+            <li><code>app_cluster_*</code> - Application-specific groups per cluster</li>
+            <li><code>ns_cluster_*</code> - Namespace groups with cluster identification</li>
+        </ul>
+
+        <pre><code class="language-bash"># Filter for cluster-specific groups
+ansible-inventory -i inventory/exercise1-2-multi-cluster.yml --list | jq 'keys[]' | grep cluster_
+
+# View environment-based groups
+ansible-inventory -i inventory/exercise1-2-multi-cluster.yml --list | jq 'keys[]' | grep env_</code></pre>
+
+        <hr>
+
+        <h2>Exercise 1.3: Event-Driven Inventory Updates</h2>
+        
+        <div class="time-allocation">
+            <strong>⏱️ Time Allocation:</strong> 10 minutes (5 min setup, 5 min testing)
+        </div>
+
+        <div class="learning-objectives">
+            <h3>Learning Objectives</h3>
+            <ul>
+                <li>Understand webhook-based inventory synchronization concepts</li>
+                <li>Configure automated inventory refresh triggers</li>
+                <li>Implement error handling for webhook failures</li>
+            </ul>
+        </div>
+
+        <h3>Step-by-Step Instructions</h3>
+
+        <h4>Step 1: Review Webhook Configuration (2 minutes)</h4>
+        <pre><code class="language-bash"># Examine the webhook-enabled inventory configuration
+cat inventory/exercise1-3-webhook-config.yml
+
+# Review webhook setup playbook
+head -50 playbooks/module1/exercise1-3-webhook-setup.yml</code></pre>
+
+        <h4>Step 2: Execute Webhook Simulation (5 minutes)</h4>
+        <pre><code class="language-bash"># Run the webhook setup and simulation
+ansible-playbook playbooks/module1/exercise1-3-webhook-setup.yml
+
+# Test the webhook-enabled inventory
+ansible-inventory -i inventory/exercise1-3-webhook-config.yml --list | jq '.webhook_enabled_true // empty'</code></pre>
+
+        <h4>Step 3: Understand Production Implementation (3 minutes)</h4>
+        <p><strong>Key Concepts Demonstrated:</strong></p>
+        <ul>
+            <li><strong>Admission Webhooks:</strong> Automatically trigger inventory refresh on resource changes</li>
+            <li><strong>Circuit Breaker Pattern:</strong> Prevent cascading failures when AAP is unavailable</li>
+            <li><strong>Rate Limiting:</strong> Protect AAP controller from webhook storms</li>
+            <li><strong>Retry Logic:</strong> Handle transient failures gracefully</li>
+        </ul>
+
+        <p><strong>Production Deployment Steps:</strong></p>
+        <ol>
+            <li>Configure AAP controller webhook endpoint</li>
+            <li>Deploy admission webhook to OpenShift</li>
+            <li>Set up proper authentication and TLS</li>
+            <li>Implement monitoring and alerting</li>
+        </ol>
+
+        <hr>
+
+        <h2>Exercise 1.4: Troubleshooting and Optimization</h2>
+        
+        <div class="time-allocation">
+            <strong>⏱️ Time Allocation:</strong> 5 minutes
+        </div>
+
+        <div class="learning-objectives">
+            <h3>Learning Objectives</h3>
+            <ul>
+                <li>Develop systematic troubleshooting approaches</li>
+                <li>Optimize inventory performance for large clusters</li>
+                <li>Generate diagnostic reports for inventory issues</li>
+            </ul>
+        </div>
+
+        <h3>Step-by-Step Instructions</h3>
+
+        <h4>Step 1: Run Comprehensive Troubleshooting (3 minutes)</h4>
+        <pre><code class="language-bash"># Execute the troubleshooting playbook
+ansible-playbook playbooks/module1/exercise1-4-troubleshooting.yml
+
+# Review the generated diagnostic report
+cat /tmp/inventory-diagnostic-*.txt</code></pre>
+
+        <h4>Step 2: Practice Diagnostic Commands (2 minutes)</h4>
+        <pre><code class="language-bash"># Test inventory performance
+time ansible-inventory -i inventory/exercise1-4-optimized-config.yml --list > /dev/null
+
+# Validate inventory groups
+ansible-inventory -i inventory/exercise1-4-optimized-config.yml --graph | head -20
+
+# Check for inventory errors
+ansible-inventory -i inventory/exercise1-4-optimized-config.yml --list 2>&1 | grep -i error || echo "No errors found"</code></pre>
+
+        <hr>
+
+        <h2>Module 1 Validation Checkpoints</h2>
+        <p>Complete these validation steps to confirm your learning:</p>
+
+        <div class="checkpoint">
+            <h3>✅ Checkpoint 1: Basic Inventory Discovery</h3>
+            <pre><code class="language-bash"># This should return pods grouped by namespace
+ansible-inventory -i inventory/exercise1-1-single-cluster.yml --graph | grep namespace_</code></pre>
+        </div>
+
+        <div class="checkpoint">
+            <h3>✅ Checkpoint 2: Multi-Cluster Grouping</h3>
+            <pre><code class="language-bash"># This should show cluster-specific groups
+ansible-inventory -i inventory/exercise1-2-multi-cluster.yml --list | jq 'keys[]' | grep cluster_</code></pre>
+        </div>
+
+        <div class="checkpoint">
+            <h3>✅ Checkpoint 3: Webhook Configuration</h3>
+            <pre><code class="language-bash"># This should show webhook-enabled pods (if any exist)
+ansible-inventory -i inventory/exercise1-3-webhook-config.yml --list | jq '.webhook_enabled_true // "No webhook-enabled pods"'</code></pre>
+        </div>
+
+        <div class="checkpoint">
+            <h3>✅ Checkpoint 4: Troubleshooting Skills</h3>
+            <pre><code class="language-bash"># This should complete without errors and generate a diagnostic report
+ls -la /tmp/inventory-diagnostic-*.txt</code></pre>
+        </div>
+
+        <h2>Common Issues and Solutions</h2>
+
+        <div class="troubleshooting">
+            <h3>Issue 1: "Failed to connect to cluster"</h3>
+            <p><strong>Symptoms:</strong> Connection refused or timeout errors</p>
+            <p><strong>Diagnosis:</strong></p>
+            <pre><code class="language-bash">kubectl cluster-info
+kubectl config current-context</code></pre>
+            <p><strong>Solution:</strong> Verify kubeconfig and network connectivity</p>
+        </div>
+
+        <div class="troubleshooting">
+            <h3>Issue 2: "Permission denied for resource discovery"</h3>
+            <p><strong>Symptoms:</strong> 403 Forbidden errors</p>
+            <p><strong>Diagnosis:</strong></p>
+            <pre><code class="language-bash">kubectl auth can-i get pods
+kubectl auth can-i list pods --all-namespaces</code></pre>
+            <p><strong>Solution:</strong> Check RBAC permissions for your service account</p>
+        </div>
+
+        <div class="troubleshooting">
+            <h3>Issue 3: "No pods in inventory"</h3>
+            <p><strong>Symptoms:</strong> Empty inventory results</p>
+            <p><strong>Diagnosis:</strong></p>
+            <pre><code class="language-bash">kubectl get pods --all-namespaces | grep -v kube-system</code></pre>
+            <p><strong>Solution:</strong> Check filters in inventory configuration, ensure pods exist</p>
+        </div>
+
+        <div class="troubleshooting">
+            <h3>Issue 4: "Inventory sync timeout"</h3>
+            <p><strong>Symptoms:</strong> Slow inventory refresh, timeout errors</p>
+            <p><strong>Solution:</strong></p>
+            <ul>
+                <li>Implement caching: <code>cache: true, cache_timeout: 300</code></li>
+                <li>Add filters to reduce resource queries</li>
+                <li>Increase timeout values in connections</li>
+            </ul>
+        </div>
+
+        <h2>Module 1 Completion Checklist</h2>
+        <p>Before proceeding to Module 2, ensure you can:</p>
+        <ul class="checklist">
+            <li>Configure single-cluster dynamic inventory with proper grouping</li>
+            <li>Set up multi-cluster inventory discovery across environments</li>
+            <li>Understand webhook-based inventory synchronization concepts</li>
+            <li>Troubleshoot common inventory issues systematically</li>
+            <li>Generate diagnostic reports for inventory problems</li>
+            <li>Optimize inventory performance for production use</li>
+        </ul>
+
+        <div class="nav-section">
+            <h2>Next Steps</h2>
+            <h3><span class="emoji">🚀</span> Ready for Module 2?</h3>
+            <p>Module 1 has established your dynamic inventory foundation. In Module 2, you'll use these inventory skills to:</p>
+            <ul>
+                <li>Deploy IMS services across the discovered environments</li>
+                <li>Implement idempotent resource management patterns</li>
+                <li>Configure automated RBAC provisioning</li>
+                <li>Build rollback capabilities for failed deployments</li>
+            </ul>
+            <p><strong>Estimated prep time for Module 2:</strong> 5 minutes to review prerequisites</p>
+        </div>
+
+        <h2>Additional Resources</h2>
+
+        <h3>Quick Reference Commands</h3>
+        <pre><code class="language-bash"># List all available inventory plugins
+ansible-doc -t inventory -l
+
+# Get help for kubernetes.core.k8s plugin
+ansible-doc -t inventory kubernetes.core.k8s
+
+# Validate inventory configuration syntax
+ansible-inventory -i &lt;inventory-file&gt; --list --export
+
+# Debug inventory issues with verbose output
+ansible-inventory -i &lt;inventory-file&gt; --list -vvv</code></pre>
+
+        <h3>Advanced Configuration Examples</h3>
+        <p>See the <code>inventory/</code> directory for additional configuration examples and optimization techniques suitable for production environments.</p>
+
+        <hr>
+
+        <div class="nav-section">
+            <p><strong><span class="emoji">⚡</span> Module 1 Complete!</strong> You now have production-ready dynamic inventory skills for multi-cluster OpenShift environments. Ready to build on this foundation in Module 2!</p>
+        </div>
+    </div>
+</body>
+</html>

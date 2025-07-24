@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Module 3: Advanced Automation and Error Handling - Workshop Guide</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+            background-color: #fafafa;
+        }
+        .container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #e74c3c;
+            border-bottom: 3px solid #e74c3c;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+            margin-top: 40px;
+        }
+        h3 {
+            color: #2980b9;
+            margin-top: 30px;
+        }
+        h4 {
+            color: #27ae60;
+            margin-top: 25px;
+        }
+        .overview {
+            background-color: #ecf0f1;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .time-allocation {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .learning-objectives {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .checkpoint {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .troubleshooting {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .integration-challenge {
+            background-color: #e2e3e5;
+            border: 2px solid #6c757d;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .success-criteria {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #ecf0f1;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        ul, ol {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+        li {
+            margin: 8px 0;
+        }
+        .checklist {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .checklist li {
+            padding: 8px 0;
+        }
+        .checklist li:before {
+            content: "☐ ";
+            color: #3498db;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .success-item:before {
+            content: "✅ ";
+            color: #27ae60;
+        }
+        .fail-item:before {
+            content: "❌ ";
+            color: #e74c3c;
+        }
+        .nav-section {
+            background-color: #34495e;
+            color: white;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 6px;
+        }
+        .nav-section h3 {
+            color: #ecf0f1;
+            margin-top: 0;
+        }
+        .completion-section {
+            background-color: #27ae60;
+            color: white;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 6px;
+        }
+        .completion-section h2, .completion-section h3 {
+            color: white;
+        }
+        hr {
+            border: none;
+            height: 2px;
+            background-color: #bdc3c7;
+            margin: 40px 0;
+        }
+        .emoji {
+            font-size: 1.2em;
+        }
+        .key-concepts {
+            background-color: #f8f9fa;
+            border-left: 4px solid #6f42c1;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .diagnostic-process {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Module 3: Advanced Automation and Error Handling - Workshop Guide</h1>
+
+        <div class="overview">
+            <h2>Overview</h2>
+            <p><strong>Duration:</strong> 45 minutes<br>
+            <strong>Objective:</strong> Master complex Jinja2 templating, comprehensive error handling patterns, automated testing with Molecule framework, and advanced troubleshooting techniques for production IMS environments</p>
+            
+            <p>In this final module, you'll synthesize all workshop learning into enterprise-grade automation capabilities, implementing sophisticated templating, circuit breaker patterns, automated testing pipelines, and systematic troubleshooting methodologies.</p>
+        </div>
+
+        <h2>Prerequisites</h2>
+        <p>Before starting this module, ensure you have:</p>
+        <ul class="checklist">
+            <li>Completed Modules 1 and 2 with working deployments</li>
+            <li>Understanding of Jinja2 templating concepts</li>
+            <li>Molecule framework installed (<code>pip install molecule[ansible]</code>)</li>
+            <li>Working IMS deployment from Module 2</li>
+            <li>Access to multiple environment configurations (dev/test/prod)</li>
+        </ul>
+
+        <h3>Quick Environment Check</h3>
+        <pre><code class="language-bash"># Verify Molecule installation
+molecule --version
+
+# Check existing IMS deployment from Module 2
+oc get deployment -n ims-dev ims-connector -o wide
+
+# Verify template rendering capability
+ansible localhost -m template -a "src=templates/test.j2 dest=/tmp/test.yml" --check
+
+# Test advanced Jinja2 filters
+pip list | grep -i jinja2</code></pre>
+
+        <h2>Module Structure</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Exercise</th>
+                    <th>Duration</th>
+                    <th>Focus Area</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>3.1</td>
+                    <td>15 min</td>
+                    <td>Advanced Jinja2 Templating</td>
+                </tr>
+                <tr>
+                    <td>3.2</td>
+                    <td>15 min</td>
+                    <td>Comprehensive Error Handling and Retry Logic</td>
+                </tr>
+                <tr>
+                    <td>3.3</td>
+                    <td>10 min</td>
+                    <td>Automated Testing with Molecule</td>
+                </tr>
+                <tr>
+                    <td>3.4</td>
+                    <td>5 min</td>
+                    <td>Troubleshooting Challenge</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <hr>
+
+        <h2>Exercise 3.1: Advanced Jinja2 Templating</h2>
+        
+        <div class="time-allocation">
+            <strong>⏱️ Time Allocation:</strong> 15 minutes (10 min implementation, 5 min testing)
+        </div>
+
+        <div class="learning-objectives">
+            <h3>Learning Objectives</h3>
+            <ul>
+                <li>Create dynamic, environment-aware OpenShift resource definitions</li>
+                <li>Implement conditional resource generation based on cluster capabilities</li>
+                <li>Build complex data transformations for IMS connectivity patterns</li>
+            </ul>
+        </div>
+
+        <h3>Step-by-Step Instructions</h3>
+
+        <h4>Step 1: Review Advanced Template Structure (3 minutes)</h4>
+        <pre><code class="language-bash"># Examine the advanced templating playbook
+cat playbooks/module3/exercise3-1-advanced-templating.yml
+
+# Review the complex template structure
+cat roles/ims_deployment/templates/application.yml.j2
+
+# Check environment-specific configuration
+cat group_vars/all/environment_config.yml</code></pre>
+
+        <div class="key-concepts">
+            <p><strong>Key Templating Concepts:</strong></p>
+            <ul>
+                <li><strong>Conditional Blocks</strong> - <code>{% if target_env == 'prod' %}</code> for environment-specific logic</li>
+                <li><strong>Complex Loops</strong> - <code>{% for key, value in pod_annotations.items() %}</code> for dynamic data</li>
+                <li><strong>Data Transformations</strong> - Environment-specific resource calculations</li>
+                <li><strong>Nested Variables</strong> - <code>{{ environment_config[target_env].replicas }}</code> for structured data</li>
+            </ul>
+        </div>
+
+        <h4>Step 2: Generate Environment-Specific Configurations (7 minutes)</h4>
+        <pre><code class="language-bash"># Generate development environment configuration
+ansible-playbook playbooks/module3/exercise3-1-advanced-templating.yml \
+  -e target_env=dev \
+  -e debug_templating=true
+
+# Generate production environment configuration
+ansible-playbook playbooks/module3/exercise3-1-advanced-templating.yml \
+  -e target_env=prod \
+  -e debug_templating=true
+
+# Compare generated configurations
+diff /tmp/ims-config-dev.yml /tmp/ims-config-prod.yml</code></pre>
+
+        <h4>Step 3: Test Template Conditional Logic (5 minutes)</h4>
+        <pre><code class="language-bash"># Test template with different variables
+ansible-playbook playbooks/module3/exercise3-1-advanced-templating.yml \
+  -e target_env=prod \
+  -e persistent_storage_required=true \
+  -e enable_monitoring=true
+
+# Verify conditional resources were generated
+grep -A 10 "volumes:" /tmp/ims-config-prod.yml
+grep -A 5 "affinity:" /tmp/ims-config-prod.yml
+
+# Test template error handling
+ansible-playbook playbooks/module3/exercise3-1-advanced-templating.yml \
+  -e target_env=invalid_env</code></pre>
+
+        <h4>Step 4: Validation Checkpoint (5 minutes)</h4>
+        <div class="checkpoint">
+            <p><strong>Expected Results:</strong></p>
+            <ul>
+                <li class="success-item">Development config has minimal resources and no affinity rules</li>
+                <li class="success-item">Production config includes persistent storage, anti-affinity, and monitoring</li>
+                <li class="success-item">Environment-specific resource limits are applied correctly</li>
+                <li class="success-item">Template validation catches invalid environment configurations</li>
+            </ul>
+        </div>
+
+        <div class="troubleshooting">
+            <p><strong>Troubleshooting Template Issues:</strong></p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Issue</th>
+                        <th>Symptoms</th>
+                        <th>Solution</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Template syntax error</td>
+                        <td>"TemplateSyntaxError"</td>
+                        <td>Check Jinja2 syntax: brackets, quotes, filters</td>
+                    </tr>
+                    <tr>
+                        <td>Undefined variable</td>
+                        <td>"UndefinedError"</td>
+                        <td>Add variable defaults: <code>{{ var | default('value') }}</code></td>
+                    </tr>
+                    <tr>
+                        <td>Wrong conditional logic</td>
+                        <td>Resources in wrong environment</td>
+                        <td>Review <code>{% if %}</code> conditions and variable values</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <hr>
+
+        <h2>Exercise 3.2: Comprehensive Error Handling and Retry Logic</h2>
+        
+        <div class="time-allocation">
+            <strong>⏱️ Time Allocation:</strong> 15 minutes (10 min implementation, 5 min testing)
+        </div>
+
+        <div class="learning-objectives">
+            <h3>Learning Objectives</h3>
+            <ul>
+                <li>Implement exponential backoff retry mechanisms</li>
+                <li>Create circuit breaker patterns for external dependencies</li>
+                <li>Build state validation and repair automation</li>
+                <li>Develop comprehensive logging and alerting capabilities</li>
+            </ul>
+        </div>
+
+        <h3>Step-by-Step Instructions</h3>
+
+        <h4>Step 1: Review Advanced Error Handling Patterns (3 minutes)</h4>
+        <pre><code class="language-bash"># Examine the error handling playbook
+cat playbooks/module3/exercise3-2-error-handling.yml
+
+# Review the retry logic implementation
+grep -A 15 "exponential backoff" playbooks/module3/exercise3-2-error-handling.yml
+
+# Check circuit breaker configuration
+grep -A 10 "circuit_breaker" playbooks/module3/exercise3-2-error-handling.yml</code></pre>
+
+        <div class="key-concepts">
+            <p><strong>Advanced Error Handling Components:</strong></p>
+            <ul>
+                <li><strong>Exponential Backoff</strong> - <code>delay: {{ [base_delay * (2 ** retry_attempt), max_delay] | min }}</code></li>
+                <li><strong>Circuit Breaker</strong> - Prevents cascade failures when services are unavailable</li>
+                <li><strong>State Validation</strong> - Comprehensive health checks before marking success</li>
+                <li><strong>Comprehensive Logging</strong> - Detailed error tracking and alerting</li>
+            </ul>
+        </div>
+
+        <h4>Step 2: Test Successful Deployment with Advanced Error Handling (4 minutes)</h4>
+        <pre><code class="language-bash"># Run deployment with comprehensive error handling
+ansible-playbook playbooks/module3/exercise3-2-error-handling.yml \
+  -e target_env=dev \
+  -e ims_version=1.3.0
+
+# Check detailed deployment logs
+cat /tmp/ims-deployment-dev-$(date +%Y%m%d).log
+
+# Verify circuit breaker status
+grep -i "circuit.*closed" /tmp/ims-deployment-dev-$(date +%Y%m%d).log</code></pre>
+
+        <h4>Step 3: Simulate Failure Scenarios and Recovery (5 minutes)</h4>
+        <pre><code class="language-bash"># Test exponential backoff with temporary failures
+ansible-playbook playbooks/module3/exercise3-2-error-handling.yml \
+  -e target_env=dev \
+  -e simulate_transient_failure=true \
+  -e max_retries=3
+
+# Test circuit breaker activation
+ansible-playbook playbooks/module3/exercise3-2-error-handling.yml \
+  -e target_env=dev \
+  -e simulate_circuit_breaker=true \
+  -e circuit_breaker_threshold=2
+
+# Verify recovery after circuit breaker reset
+sleep 30
+ansible-playbook playbooks/module3/exercise3-2-error-handling.yml \
+  -e target_env=dev \
+  -e ims_version=1.3.1</code></pre>
+
+        <h4>Step 4: Test State Validation and Repair (3 minutes)</h4>
+        <pre><code class="language-bash"># Introduce configuration drift
+oc scale deployment ims-connector --replicas=1 -n ims-dev
+
+# Run playbook to detect and repair drift
+ansible-playbook playbooks/module3/exercise3-2-error-handling.yml \
+  -e target_env=dev \
+  -e enable_drift_detection=true
+
+# Verify repair was successful
+oc get deployment ims-connector -n ims-dev -o jsonpath='{.spec.replicas}'</code></pre>
+
+        <div class="checkpoint">
+            <p><strong>Expected Behavior:</strong></p>
+            <ul>
+                <li class="success-item">Exponential backoff increases delay between retry attempts</li>
+                <li class="success-item">Circuit breaker opens after threshold failures and prevents further attempts</li>
+                <li class="success-item">State validation detects configuration drift and repairs automatically</li>
+                <li class="success-item">Comprehensive logging captures all error scenarios and recovery actions</li>
+            </ul>
+        </div>
+
+        <hr>
+
+        <h2>Exercise 3.3: Automated Testing with Molecule</h2>
+        
+        <div class="time-allocation">
+            <strong>⏱️ Time Allocation:</strong> 10 minutes (6 min setup, 4 min execution)
+        </div>
+
+        <div class="learning-objectives">
+            <h3>Learning Objectives</h3>
+            <ul>
+                <li>Create comprehensive test automation using Molecule framework</li>
+                <li>Implement test scenarios for different environments</li>
+                <li>Build verification tests for deployed resources</li>
+                <li>Validate idempotency and integration testing</li>
+            </ul>
+        </div>
+
+        <h3>Step-by-Step Instructions</h3>
+
+        <h4>Step 1: Review Molecule Test Structure (2 minutes)</h4>
+        <pre><code class="language-bash"># Examine the Molecule configuration
+cat molecule/default/molecule.yml
+
+# Review test scenarios
+ls -la molecule/
+cat molecule/default/verify.yml</code></pre>
+
+        <h4>Step 2: Execute Molecule Test Suite (4 minutes)</h4>
+        <pre><code class="language-bash"># Run the default test scenario
+cd /Users/apippert/Development/AAP-with-OCP-Workshop
+molecule test
+
+# Run specific test scenario for production simulation
+molecule test -s prod-simulation</code></pre>
+
+        <h4>Step 3: Analyze Test Results and Coverage (4 minutes)</h4>
+        <pre><code class="language-bash"># Review test execution logs
+molecule test --debug | tail -50
+
+# Check idempotency test results
+grep -i "idempotent" molecule/default/molecule.log
+
+# Verify all test assertions passed
+grep -i "TASK.*assert" molecule/default/molecule.log</code></pre>
+
+        <div class="checkpoint">
+            <p><strong>Expected Test Coverage:</strong></p>
+            <ul>
+                <li class="success-item">Syntax validation passes for all playbooks</li>
+                <li class="success-item">Deployment converges successfully</li>
+                <li class="success-item">Idempotency test shows no changes on second run</li>
+                <li class="success-item">All resource verification assertions pass</li>
+                <li class="success-item">Service health checks validate connectivity</li>
+            </ul>
+        </div>
+
+        <hr>
+
+        <h2>Exercise 3.4: Troubleshooting Challenge</h2>
+        
+        <div class="time-allocation">
+            <strong>⏱️ Time Allocation:</strong> 5 minutes
+        </div>
+
+        <div class="learning-objectives">
+            <h3>Learning Objectives</h3>
+            <ul>
+                <li>Debug intentionally broken IMS deployment scenarios</li>
+                <li>Use systematic troubleshooting methodology</li>
+                <li>Apply diagnostic tools and techniques learned throughout workshop</li>
+            </ul>
+        </div>
+
+        <h3>Step-by-Step Instructions</h3>
+
+        <h4>Step 1: Diagnose Pre-Staged Failures (3 minutes)</h4>
+        <pre><code class="language-bash"># Run the troubleshooting challenge playbook
+ansible-playbook playbooks/module3/exercise3-4-troubleshooting.yml \
+  -e deploy_broken_scenario=permission_denied
+
+# Use systematic diagnostic approach
+ansible-playbook troubleshooting/diagnostic_playbook.yml \
+  -e target_env=dev
+
+# Review diagnostic report
+cat /tmp/ims-diagnostic-$(date +%s).txt</code></pre>
+
+        <h4>Step 2: Implement Fixes and Verify Resolution (2 minutes)</h4>
+        <pre><code class="language-bash"># Apply systematic fixes based on diagnostic results
+ansible-playbook playbooks/module3/exercise3-3-troubleshooting.yml \
+  -e fix_discovered_issues=true
+
+# Validate resolution
+oc get deployment ims-connector -n ims-dev -o wide
+curl -s http://ims-connector.ims-dev.svc.cluster.local:8080/health</code></pre>
+
+        <p><strong>Troubleshooting Scenarios Covered:</strong></p>
+        <ul>
+            <li><strong>Scenario A:</strong> Service account permission failures</li>
+            <li><strong>Scenario B:</strong> Resource quota exceeded errors</li>
+            <li><strong>Scenario C:</strong> Network policy blocking connectivity</li>
+            <li><strong>Scenario D:</strong> Template rendering errors</li>
+        </ul>
+
+        <div class="diagnostic-process">
+            <p><strong>Expected Diagnostic Process:</strong></p>
+            <ol>
+                <li><strong>Systematic Information Gathering</strong> - Collect logs, resource states, permissions</li>
+                <li><strong>Root Cause Analysis</strong> - Identify the underlying issue from symptoms</li>
+                <li><strong>Fix Implementation</strong> - Apply appropriate corrections</li>
+                <li><strong>Validation</strong> - Confirm resolution and prevent recurrence</li>
+            </ol>
+        </div>
+
+        <hr>
+
+        <h2>Module 3 Validation Checkpoints</h2>
+        <p>Complete these validation steps to confirm your mastery:</p>
+
+        <div class="checkpoint">
+            <h3>✅ Checkpoint 1: Advanced Templating</h3>
+            <pre><code class="language-bash"># This should generate different configurations for each environment
+ansible-playbook playbooks/module3/exercise3-1-advanced-templating.yml -e target_env=dev
+ansible-playbook playbooks/module3/exercise3-1-advanced-templating.yml -e target_env=prod
+diff /tmp/ims-config-dev.yml /tmp/ims-config-prod.yml | wc -l</code></pre>
+        </div>
+
+        <div class="checkpoint">
+            <h3>✅ Checkpoint 2: Error Handling Sophistication</h3>
+            <pre><code class="language-bash"># This should show retry attempts and successful recovery
+grep -c "Retry attempt" /tmp/ims-deployment-dev-$(date +%Y%m%d).log</code></pre>
+        </div>
+
+        <div class="checkpoint">
+            <h3>✅ Checkpoint 3: Automated Testing</h3>
+            <pre><code class="language-bash"># This should show all tests passing
+molecule test --dry-run | grep -c "PLAY RECAP.*ok"</code></pre>
+        </div>
+
+        <div class="checkpoint">
+            <h3>✅ Checkpoint 4: Troubleshooting Skills</h3>
+            <pre><code class="language-bash"># This should show comprehensive diagnostic information
+test -f /tmp/ims-diagnostic-*.txt && echo "Diagnostic report generated successfully"</code></pre>
+        </div>
+
+        <div class="integration-challenge">
+            <h2>Workshop Final Integration Challenge</h2>
+            <h3>Complete IMS Environment Deployment</h3>
+            <p>Deploy a production-ready IMS environment using all three modules:</p>
+            
+            <pre><code class="language-bash"># Step 1: Use Module 1 dynamic inventory to discover targets
+ansible-inventory -i inventory/exercise1-2-multi-cluster.yml --list
+
+# Step 2: Deploy with Module 2 idempotent patterns and RBAC
+ansible-playbook playbooks/module2/exercise2-1-idempotent-deployment.yml \
+  -e target_env=prod
+
+# Step 3: Apply Module 3 advanced templating and error handling
+ansible-playbook playbooks/module3/exercise3-2-error-handling.yml \
+  -e target_env=prod \
+  -e enable_production_monitoring=true
+
+# Step 4: Validate with automated testing
+molecule test -s prod-simulation</code></pre>
+
+            <div class="success-criteria">
+                <p><strong>Success Criteria:</strong></p>
+                <ul class="checklist">
+                    <li>Multi-cluster inventory discovers all target environments</li>
+                    <li>Idempotent deployment with comprehensive RBAC automation</li>
+                    <li>Advanced templating generates environment-appropriate configurations</li>
+                    <li>Error handling provides resilient deployment patterns</li>
+                    <li>Automated testing validates entire workflow</li>
+                    <li>Troubleshooting skills demonstrate systematic problem resolution</li>
+                </ul>
+            </div>
+        </div>
+
+        <h2>Common Issues and Solutions</h2>
+
+        <div class="troubleshooting">
+            <h3>Issue 1: "Template rendering failed"</h3>
+            <p><strong>Symptoms:</strong> Jinja2 template errors or undefined variables</p>
+            <p><strong>Diagnosis:</strong></p>
+            <pre><code class="language-bash">ansible-playbook &lt;playbook&gt; --syntax-check
+ansible-playbook &lt;playbook&gt; -e debug_templating=true --check</code></pre>
+            <p><strong>Solution:</strong> Verify template syntax and ensure all variables are defined with defaults</p>
+        </div>
+
+        <div class="troubleshooting">
+            <h3>Issue 2: "Molecule test failures"</h3>
+            <p><strong>Symptoms:</strong> Test assertions fail or resources not properly validated</p>
+            <p><strong>Diagnosis:</strong></p>
+            <pre><code class="language-bash">molecule test --debug
+molecule verify --debug</code></pre>
+            <p><strong>Solution:</strong> Check test expectations against actual resource states, update verification tasks</p>
+        </div>
+
+        <div class="troubleshooting">
+            <h3>Issue 3: "Circuit breaker stuck open"</h3>
+            <p><strong>Symptoms:</strong> Deployments fail immediately without retry attempts</p>
+            <p><strong>Solution:</strong></p>
+            <ul>
+                <li>Check circuit breaker timeout configuration</li>
+                <li>Manually reset circuit breaker state: <code>-e reset_circuit_breaker=true</code></li>
+                <li>Verify underlying service availability</li>
+            </ul>
+        </div>
+
+        <div class="troubleshooting">
+            <h3>Issue 4: "Exponential backoff not working"</h3>
+            <p><strong>Symptoms:</strong> Retries occur too quickly or don't increase delay properly</p>
+            <p><strong>Solution:</strong></p>
+            <ul>
+                <li>Verify mathematical expression in delay calculation</li>
+                <li>Check <code>max_delay</code> and <code>base_delay</code> variable values</li>
+                <li>Review retry loop implementation</li>
+            </ul>
+        </div>
+
+        <h2>Module 3 Completion Checklist</h2>
+        <p>Workshop completion requires mastery of:</p>
+        <ul class="checklist">
+            <li>Complex Jinja2 templating with conditional logic and data transformations</li>
+            <li>Production-grade error handling with retry mechanisms and circuit breakers</li>
+            <li>Automated testing pipelines using Molecule framework</li>
+            <li>Systematic troubleshooting methodology for production environments</li>
+            <li>Integration of all three modules into cohesive automation workflow</li>
+            <li>Documentation of lessons learned and best practices</li>
+        </ul>
+
+        <h2>Knowledge Transfer and Continuous Learning</h2>
+
+        <h3>Advanced Challenges for Continued Development</h3>
+        <ul class="checklist">
+            <li>Custom Jinja2 filter development for specialized transformations</li>
+            <li>Operator pattern implementation using operator-sdk</li>
+            <li>GitOps integration with ArgoCD for declarative deployments</li>
+            <li>Multi-cluster deployment orchestration across regions</li>
+        </ul>
+
+        <h3>Best Practices Documentation</h3>
+        <p>Create documentation covering:</p>
+        <ul class="checklist">
+            <li>Template library for common IMS patterns</li>
+            <li>Error handling playbook collection</li>
+            <li>Troubleshooting runbook for production incidents</li>
+            <li>Testing strategy guide for complex automation</li>
+        </ul>
+
+        <h2>Workshop Success Metrics</h2>
+
+        <p><strong>Individual Mastery:</strong></p>
+        <ul>
+            <li>Complete IMS environment deployed across dev/test/prod</li>
+            <li>All Molecule tests passing consistently</li>
+            <li>Troubleshooting scenarios resolved independently within time limits</li>
+            <li>Production-ready automation artifacts suitable for enterprise use</li>
+        </ul>
+
+        <p><strong>Knowledge Transfer:</strong></p>
+        <ul>
+            <li>Peer code review participation and constructive feedback</li>
+            <li>Documentation of lessons learned and prevention strategies</li>
+            <li>Mentoring support for less experienced participants</li>
+            <li>Best practices sharing with broader team</li>
+        </ul>
+
+        <h2>Additional Resources</h2>
+
+        <h3>Production Implementation Guide</h3>
+        <pre><code class="language-bash"># Recommended directory structure for production use
+enterprise-ims-automation/
+├── inventories/
+│   ├── production/
+│   ├── staging/
+│   └── development/
+├── playbooks/
+│   ├── site.yml
+│   ├── deploy-ims.yml
+│   └── troubleshoot.yml
+├── roles/
+│   ├── ims_deployment/
+│   ├── ims_rbac/
+│   └── ims_monitoring/
+├── molecule/
+│   ├── default/
+│   └── production/
+└── docs/
+    ├── runbooks/
+    └── architecture/</code></pre>
+
+        <h3>Enterprise Integration Patterns</h3>
+        <ul>
+            <li><strong>CI/CD Integration:</strong> Jenkins/GitLab pipelines with Molecule testing</li>
+            <li><strong>Monitoring Integration:</strong> Prometheus metrics and Grafana dashboards</li>
+            <li><strong>Security Integration:</strong> Vault secrets management and compliance scanning</li>
+            <li><strong>Documentation Integration:</strong> Automated documentation generation from templates</li>
+        </ul>
+
+        <hr>
+
+        <div class="completion-section">
+            <h2><span class="emoji">🎉</span> Workshop Complete!</h2>
+            <p>You now possess enterprise-grade automation capabilities for IMS environments, combining dynamic inventory management, idempotent deployments, advanced templating, comprehensive error handling, and systematic troubleshooting skills. These patterns are production-ready and suitable for complex enterprise mainframe modernization initiatives.</p>
+        </div>
+    </div>
+</body>
+</html>
