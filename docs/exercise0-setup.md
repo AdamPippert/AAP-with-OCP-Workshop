@@ -80,7 +80,7 @@ This script validates:
 
 1. **OpenShift Login Required**
    ```bash
-   oc login <cluster-url>
+   oc login --token <bearer-token> <cluster-url>
    ```
 
 2. **Missing Ansible Collections**
