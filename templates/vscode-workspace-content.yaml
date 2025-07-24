@@ -1,0 +1,319 @@
+# VSCode Workspace Content Template
+# This template is used to populate each user's VSCode workspace
+
+# Playbook templates for workshop exercises
+playbooks:
+  - name: "exercise1-dynamic-inventory.yml"
+    content: |
+      ---
+      # Exercise 1: Dynamic Inventory and AAP Integration
+      # 
+      # Learning Objectives:
+      # - Configure dynamic inventory for OpenShift resources
+      # - Integrate with AAP Controller job templates
+      # - Demonstrate cross-cluster resource management
+      
+      - name: Dynamic Inventory Demo
+        hosts: localhost
+        gather_facts: false
+        vars:
+          aap_controller_url: "{{ lookup('env', 'AAP_URL') }}"
+          ocp_cluster_domain: "{{ lookup('env', 'OCP_CLUSTER_DOMAIN') }}"
+        
+        tasks:
+          - name: Verify OpenShift connection
+            kubernetes.core.k8s_info:
+              api_version: v1
+              kind: Namespace
+              name: default
+            register: ocp_connection
+          
+          - name: Display cluster information
+            debug:
+              msg: |
+                Connected to OpenShift cluster: {{ ocp_cluster_domain }}
+                Current user: {{ ansible_env.USER | default('unknown') }}
+                Available namespaces: {{ ocp_connection.resources | length }}
+          
+          - name: Test AAP Controller connectivity
+            uri:
+              url: "{{ aap_controller_url }}/api/v2/ping/"
+              method: GET
+              validate_certs: false
+            register: aap_ping
+          
+          - name: Display AAP status
+            debug:
+              msg: "AAP Controller is {{ 'available' if aap_ping.status == 200 else 'unavailable' }}"
+
+  - name: "exercise2-idempotent-resources.yml"
+    content: |
+      ---
+      # Exercise 2: Idempotent Resource Management and RBAC
+      # 
+      # Learning Objectives:
+      # - Implement idempotent OpenShift resource management
+      # - Configure RBAC policies
+      # - Handle resource lifecycle with proper error handling
+      
+      - name: Idempotent Resource Management
+        hosts: localhost
+        gather_facts: false
+        vars:
+          workshop_namespace: "workshop-user{{ lookup('env', 'USER_NUMBER') | default('01') }}"
+          app_name: "sample-app"
+        
+        tasks:
+          - name: Create workshop namespace
+            kubernetes.core.k8s:
+              name: "{{ workshop_namespace }}"
+              api_version: v1
+              kind: Namespace
+              state: present
+              definition:
+                metadata:
+                  labels:
+                    workshop.user: "user{{ lookup('env', 'USER_NUMBER') | default('01') }}"
+                    workshop.type: "aap-integration"
+          
+          - name: Create service account
+            kubernetes.core.k8s:
+              state: present
+              definition:
+                apiVersion: v1
+                kind: ServiceAccount
+                metadata:
+                  name: "{{ app_name }}-sa"
+                  namespace: "{{ workshop_namespace }}"
+          
+          - name: Apply RBAC configuration
+            kubernetes.core.k8s:
+              state: present
+              definition:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: Role
+                metadata:
+                  name: "{{ app_name }}-role"
+                  namespace: "{{ workshop_namespace }}"
+                rules:
+                - apiGroups: [""]
+                  resources: ["pods", "services", "configmaps"]
+                  verbs: ["get", "list", "create", "update", "patch", "delete"]
+
+  - name: "exercise3-advanced-automation.yml"
+    content: |
+      ---
+      # Exercise 3: Advanced Automation and Error Handling
+      # 
+      # Learning Objectives:
+      # - Implement complex Jinja2 templating
+      # - Advanced error handling and retry mechanisms
+      # - Multi-environment deployment patterns
+      
+      - name: Advanced Automation Patterns
+        hosts: localhost
+        gather_facts: false
+        vars:
+          environments:
+            - name: dev
+              replicas: 1
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "128Mi"
+            - name: test
+              replicas: 2
+              resources:
+                requests:
+                  cpu: "200m"
+                  memory: "256Mi"
+            - name: prod
+              replicas: 3
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "512Mi"
+        
+        tasks:
+          - name: Deploy applications across environments
+            kubernetes.core.k8s:
+              state: present
+              definition:
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: "sample-app-{{ item.name }}"
+                  namespace: "workshop-user{{ lookup('env', 'USER_NUMBER') | default('01') }}"
+                  labels:
+                    environment: "{{ item.name }}"
+                spec:
+                  replicas: "{{ item.replicas }}"
+                  selector:
+                    matchLabels:
+                      app: "sample-app"
+                      environment: "{{ item.name }}"
+                  template:
+                    metadata:
+                      labels:
+                        app: "sample-app"
+                        environment: "{{ item.name }}"
+                    spec:
+                      containers:
+                      - name: app
+                        image: "registry.redhat.io/ubi8/httpd-24:latest"
+                        resources: "{{ item.resources }}"
+            loop: "{{ environments }}"
+            register: deployment_results
+            retries: 3
+            delay: 10
+            until: deployment_results is not failed
+
+# Role templates
+roles:
+  - name: "openshift-app-deploy"
+    tasks_main: |
+      ---
+      # Role: openshift-app-deploy
+      # Deploy applications to OpenShift with best practices
+      
+      - name: Validate required variables
+        assert:
+          that:
+            - app_name is defined
+            - app_namespace is defined
+            - app_image is defined
+          fail_msg: "Required variables (app_name, app_namespace, app_image) must be defined"
+      
+      - name: Create application namespace
+        kubernetes.core.k8s:
+          name: "{{ app_namespace }}"
+          api_version: v1
+          kind: Namespace
+          state: present
+      
+      - name: Deploy application
+        kubernetes.core.k8s:
+          state: present
+          definition:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: "{{ app_name }}"
+              namespace: "{{ app_namespace }}"
+            spec:
+              replicas: "{{ app_replicas | default(1) }}"
+              selector:
+                matchLabels:
+                  app: "{{ app_name }}"
+              template:
+                metadata:
+                  labels:
+                    app: "{{ app_name }}"
+                spec:
+                  containers:
+                  - name: "{{ app_name }}"
+                    image: "{{ app_image }}"
+                    ports:
+                    - containerPort: 8080
+
+# Inventory templates
+inventory:
+  - name: "openshift-dynamic.yml"
+    content: |
+      ---
+      # Dynamic OpenShift Inventory
+      plugin: kubernetes.core.k8s
+      connections:
+        - kubeconfig: ~/.kube/config
+      
+      # Group by namespace
+      compose:
+        ansible_host: ansible_host
+        namespace: metadata.namespace
+        pod_name: metadata.name
+        pod_ip: status.podIP
+      
+      # Select only running pods
+      filters:
+        - status.phase == "Running"
+      
+      # Group by labels
+      keyed_groups:
+        - key: metadata.labels.app
+          prefix: app
+        - key: metadata.namespace
+          prefix: namespace
+
+# Documentation templates
+docs:
+  - name: "exercise-instructions.md"
+    content: |
+      # AAP Workshop Exercise Instructions
+      
+      Welcome to the Advanced Ansible Automation Platform Workshop! This VSCode environment is pre-configured with all the tools you need.
+      
+      ## Getting Started
+      
+      1. **Open Terminal**: Use Ctrl+` or Terminal → New Terminal
+      2. **Test Connections**:
+         ```bash
+         oc whoami
+         curl -k $AAP_URL/api/v2/ping/
+         ```
+      3. **Install Dependencies** (if not already done):
+         ```bash
+         ansible-galaxy collection install -r requirements.yml
+         pip install -r requirements.txt
+         ```
+      
+      ## Exercise Structure
+      
+      - `playbooks/exercise1-dynamic-inventory.yml` - Module 1: Dynamic Inventory
+      - `playbooks/exercise2-idempotent-resources.yml` - Module 2: Resource Management
+      - `playbooks/exercise3-advanced-automation.yml` - Module 3: Advanced Patterns
+      
+      ## Your Environment
+      
+      - **User Number**: {{ lookup('env', 'USER_NUMBER') }}
+      - **Email**: {{ lookup('env', 'USER_EMAIL') }}
+      - **Cluster**: {{ lookup('env', 'OCP_CLUSTER_DOMAIN') }}
+      - **AAP Controller**: {{ lookup('env', 'AAP_URL') }}
+      
+      ## Running Exercises
+      
+      ```bash
+      # Exercise 1: Dynamic Inventory
+      ansible-playbook playbooks/exercise1-dynamic-inventory.yml -v
+      
+      # Exercise 2: Resource Management
+      ansible-playbook playbooks/exercise2-idempotent-resources.yml -v
+      
+      # Exercise 3: Advanced Automation
+      ansible-playbook playbooks/exercise3-advanced-automation.yml -v
+      ```
+      
+      ## Useful Commands
+      
+      ```bash
+      # OpenShift commands
+      oc get pods -A
+      oc get namespaces
+      oc describe pod <pod-name>
+      
+      # Ansible commands
+      ansible-lint playbooks/
+      ansible-playbook --syntax-check playbooks/exercise1-dynamic-inventory.yml
+      ansible-doc kubernetes.core.k8s
+      
+      # Debugging
+      ansible-playbook playbooks/exercise1-dynamic-inventory.yml -vvv
+      ```
+      
+      ## Getting Help
+      
+      - **Check logs**: Look at the terminal output for error messages
+      - **Validate syntax**: Use `ansible-playbook --syntax-check`
+      - **Test connectivity**: Use `oc whoami` and `curl -k $AAP_URL/api/v2/ping/`
+      - **Ask instructor**: Raise your hand or ask in chat
+      
+      Happy learning!

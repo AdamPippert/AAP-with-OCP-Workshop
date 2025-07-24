@@ -1,0 +1,46 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: workshop-vscode
+  labels:
+    workshop.type: "aap-openshift-integration"
+    workshop.component: "vscode-server"
+  annotations:
+    openshift.io/description: "VSCode Server instances for AAP Workshop"
+    openshift.io/display-name: "Workshop VSCode"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: vscode-server-quota
+  namespace: workshop-vscode
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: "40Gi"
+    limits.cpu: "40"
+    limits.memory: "80Gi"
+    persistentvolumeclaims: "50"
+    requests.storage: "100Gi"
+    count/pods: "50"
+    count/services: "50"
+    count/routes: "50"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: vscode-server-limits
+  namespace: workshop-vscode
+spec:
+  limits:
+  - default:
+      cpu: "1"
+      memory: "2Gi"
+    defaultRequest:
+      cpu: "500m"
+      memory: "1Gi"
+    type: Container
+  - default:
+      storage: "2Gi"
+    type: PersistentVolumeClaim
