@@ -76,6 +76,8 @@ AAP-with-OCP-Workshop/
 - Ansible Automation Platform 2.5 access
 - `oc` CLI configured and authenticated
 - Bash shell environment (Linux/macOS/WSL)
+- Ansible 2.5 Product Demo environment from Red Hat Demo Platform (accessible by RH or partners)
+- details.txt file created from the "Users" section in the Demo Platform using the "Data" field
 
 ### Workshop Setup
 
