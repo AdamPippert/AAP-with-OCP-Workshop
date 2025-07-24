@@ -32,7 +32,7 @@
           4. Environment-based categorization
 
     - name: Check available kubeconfig contexts
-      shell: kubectl config get-contexts -o name
+      shell: oc config get-contexts -o name
       register: available_contexts
       ignore_errors: true
 

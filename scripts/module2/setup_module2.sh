@@ -55,9 +55,9 @@ print_exercise_header() {
 check_prerequisites() {
     log_info "Checking prerequisites..."
     
-    # Check if kubectl is available
-    if ! command -v kubectl &> /dev/null; then
-        log_error "kubectl is not installed or not in PATH"
+    # Check if oc is available
+    if ! command -v oc &> /dev/null; then
+        log_error "oc is not installed or not in PATH"
         exit 1
     fi
     
@@ -68,8 +68,8 @@ check_prerequisites() {
     fi
     
     # Check cluster connectivity
-    if ! kubectl cluster-info &> /dev/null; then
-        log_error "Cannot connect to Kubernetes cluster"
+    if ! oc cluster-info &> /dev/null; then
+        log_error "Cannot connect to OpenShift cluster"
         exit 1
     fi
     
@@ -125,10 +125,10 @@ show_environment_info() {
     echo -e "  Mainframe Host: $MAINFRAME_HOST"
     
     echo -e "\n${YELLOW}Cluster Information:${NC}"
-    kubectl cluster-info --context=$(kubectl config current-context) | head -2
+    oc cluster-info --context=$(oc config current-context) | head -2
     
     echo -e "\n${YELLOW}Current Context:${NC}"
-    kubectl config current-context
+    oc config current-context
     
     echo ""
 }
@@ -157,9 +157,9 @@ cleanup_on_failure() {
     log_warning "Cleaning up resources due to failure..."
     
     # Attempt to delete the namespace if it was created
-    if kubectl get namespace "$NAMESPACE" &>/dev/null; then
+    if oc get namespace "$NAMESPACE" &>/dev/null; then
         log_info "Deleting namespace: $NAMESPACE"
-        kubectl delete namespace "$NAMESPACE" --ignore-not-found=true --timeout=60s
+        oc delete namespace "$NAMESPACE" --ignore-not-found=true --timeout=60s
     fi
 }
 
@@ -240,9 +240,9 @@ main() {
         echo -e "3. Proceed to Module 3 for advanced automation patterns"
         
         echo -e "\n${BLUE}Useful Commands:${NC}"
-        echo -e "  kubectl get all -n $NAMESPACE"
-        echo -e "  kubectl describe deployment ims-connector -n $NAMESPACE"
-        echo -e "  kubectl get rolebindings -n $NAMESPACE"
+        echo -e "  oc get all -n $NAMESPACE"
+        echo -e "  oc describe deployment ims-connector -n $NAMESPACE"
+        echo -e "  oc get rolebindings -n $NAMESPACE"
         echo -e "  ./scripts/module2/validate_module2.sh $NAMESPACE $ENVIRONMENT"
         
     else

@@ -21,16 +21,16 @@ Before starting this module, ensure you have:
 
 ```bash
 # Verify cluster connectivity
-kubectl get nodes
+oc get nodes
 
 # Check your current context
-kubectl config current-context
+oc config current-context
 
 # Verify Ansible collections
 ansible-galaxy collection list | grep kubernetes.core
 
 # Test basic OpenShift API access
-kubectl get pods --all-namespaces | head -5
+oc get pods --all-namespaces | head -5
 ```
 
 ## Module Structure
@@ -94,9 +94,9 @@ ansible-inventory -i inventory/exercise1-1-single-cluster.yml --graph
 
 | Issue | Symptoms | Solution |
 |-------|----------|----------|
-| No pods discovered | Empty inventory output | Check cluster connectivity: `kubectl get pods` |
-| Permission denied | 403 Forbidden errors | Verify RBAC: `kubectl auth can-i get pods` |
-| Wrong context | Connection refused | Check context: `kubectl config current-context` |
+| No pods discovered | Empty inventory output | Check cluster connectivity: `oc get pods` |
+| Permission denied | 403 Forbidden errors | Verify RBAC: `oc auth can-i get pods` |
+| Wrong context | Connection refused | Check context: `oc config current-context` |
 
 ---
 
@@ -115,7 +115,7 @@ ansible-inventory -i inventory/exercise1-1-single-cluster.yml --graph
 
 ```bash
 # Check available contexts
-kubectl config get-contexts
+oc config get-contexts
 
 # Update inventory file with your actual context names
 # Edit inventory/exercise1-2-multi-cluster.yml
@@ -272,8 +272,8 @@ ls -la /tmp/inventory-diagnostic-*.txt
 **Symptoms:** Connection refused or timeout errors
 **Diagnosis:**
 ```bash
-kubectl cluster-info
-kubectl config current-context
+oc cluster-info
+oc config current-context
 ```
 **Solution:** Verify kubeconfig and network connectivity
 
@@ -281,8 +281,8 @@ kubectl config current-context
 **Symptoms:** 403 Forbidden errors
 **Diagnosis:**
 ```bash
-kubectl auth can-i get pods
-kubectl auth can-i list pods --all-namespaces
+oc auth can-i get pods
+oc auth can-i list pods --all-namespaces
 ```
 **Solution:** Check RBAC permissions for your service account
 
@@ -290,7 +290,7 @@ kubectl auth can-i list pods --all-namespaces
 **Symptoms:** Empty inventory results
 **Diagnosis:**
 ```bash
-kubectl get pods --all-namespaces | grep -v kube-system
+oc get pods --all-namespaces | grep -v kube-system
 ```
 **Solution:** Check filters in inventory configuration, ensure pods exist
 

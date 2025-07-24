@@ -153,52 +153,48 @@ extract_details() {
     AAP_USERNAME=""
     AAP_PASSWORD=""
     
-    # Parse the details file
-    while IFS= read -r line; do
-        # AWS Credentials
-        if [[ $line =~ AWS_ACCESS_KEY_ID:\ *(.+) ]]; then
-            AWS_ACCESS_KEY="${BASH_REMATCH[1]// /}"
-        elif [[ $line =~ AWS_SECRET_ACCESS_KEY:\ *(.+) ]]; then
-            AWS_SECRET_KEY="${BASH_REMATCH[1]// /}"
-        
-        # Route53 Domain
-        elif [[ $line =~ Top\ level\ route53\ domain:\ *(.+) ]]; then
-            ROUTE53_DOMAIN="${BASH_REMATCH[1]// /}"
-        
-        # AWS Console
-        elif [[ $line =~ Web\ Console\ Access:\ *(.+) ]]; then
-            AWS_CONSOLE_URL="${BASH_REMATCH[1]// /}"
-        elif [[ $line =~ Web\ Console\ Credentials:\ *(.+)\ /\ (.+) ]]; then
-            AWS_CONSOLE_USER="${BASH_REMATCH[1]// /}"
-            AWS_CONSOLE_PASS="${BASH_REMATCH[2]// /}"
-        
-        # SSH Access
-        elif [[ $line =~ ssh\ (.+) ]]; then
-            SSH_COMMAND="${BASH_REMATCH[1]}"
-        elif [[ $line =~ password\ \'(.+)\' ]]; then
-            SSH_PASSWORD="${BASH_REMATCH[1]}"
-        
-        # OpenShift
-        elif [[ $line =~ OpenShift\ Console:\ *(.+) ]]; then
-            OPENSHIFT_CONSOLE="${BASH_REMATCH[1]// /}"
-        elif [[ $line =~ OpenShift\ API.*client:\ *(.+) ]]; then
-            OPENSHIFT_API="${BASH_REMATCH[1]// /}"
-        elif [[ $line =~ Download\ oc\ client\ from\ (.+) ]]; then
-            OC_DOWNLOAD_URL="${BASH_REMATCH[1]// /}"
-        elif [[ $line =~ (Bearer\ Token|Service\ Account\ Token):\ *(.+) ]]; then
-            OPENSHIFT_TOKEN="${BASH_REMATCH[2]// /}"
-        elif [[ $line =~ oc\ login.*--token[= ]([a-zA-Z0-9_\-\.]+) ]]; then
-            OPENSHIFT_TOKEN="${BASH_REMATCH[1]}"
-        
-        # Automation Controller (AAP)
-        elif [[ $line =~ Automation\ Controller\ URL:\ *(.+) ]]; then
-            AAP_URL="${BASH_REMATCH[1]// /}"
-        elif [[ $line =~ Automation\ Controller\ Admin\ Login:\ *(.+) ]]; then
-            AAP_USERNAME="${BASH_REMATCH[1]// /}"
-        elif [[ $line =~ Automation\ Controller\ Admin\ Password:\ *(.+) ]]; then
-            AAP_PASSWORD="${BASH_REMATCH[1]// /}"
-        fi
-    done < "${INPUT_FILE}"
+    # Function to extract value for a given key from the structured format
+    extract_value() {
+        local key="$1"
+        awk -v key="$key" '
+        $0 ~ "^[[:space:]]*" key "[[:space:]]*$" {
+            getline
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+            print
+        }' "${INPUT_FILE}"
+    }
+    
+    # Extract credentials and URLs using the new structured format
+    AAP_URL=$(extract_value "aap_controller_web_url")
+    AAP_USERNAME=$(extract_value "aap_controller_admin_user")
+    AAP_PASSWORD=$(extract_value "aap_controller_admin_password")
+    AAP_TOKEN=$(extract_value "aap_controller_token")
+    SSH_HOST=$(extract_value "bastion_public_hostname")
+    SSH_PORT=$(extract_value "bastion_ssh_port")
+    SSH_USER=$(extract_value "bastion_ssh_user_name")
+    SSH_PASSWORD=$(extract_value "bastion_ssh_password")
+    OPENSHIFT_CONSOLE=$(extract_value "openshift_console_url")
+    OPENSHIFT_API=$(extract_value "openshift_api_url")
+    OPENSHIFT_TOKEN=$(extract_value "openshift_bearer_token")
+    OC_DOWNLOAD_URL=$(extract_value "openshift_client_download_url")
+    CLUSTER_DOMAIN=$(extract_value "openshift_cluster_ingress_domain")
+    WORKSHOP_GUID=$(extract_value "guid")
+    KUBEADMIN_PASSWORD=$(extract_value "openshift_kubeadmin_password")
+    
+    # Build SSH command from components
+    if [[ -n "${SSH_USER}" && -n "${SSH_HOST}" && -n "${SSH_PORT}" ]]; then
+        SSH_COMMAND="${SSH_USER}@${SSH_HOST} -p ${SSH_PORT}"
+    fi
+    
+    # Set route53 domain to cluster domain
+    ROUTE53_DOMAIN="${CLUSTER_DOMAIN}"
+    
+    # AWS credentials are not available in new format
+    AWS_ACCESS_KEY=""
+    AWS_SECRET_KEY=""
+    AWS_CONSOLE_URL=""
+    AWS_CONSOLE_USER=""
+    AWS_CONSOLE_PASS=""
     
     log_success "Lab details extracted successfully"
 }
@@ -548,6 +544,14 @@ EOF
                         <div class="credential-item">
                             <span class="credential-label">Password:</span>
                             <span class="credential-value">${AAP_PASSWORD}</span>
+                        </div>
+EOF
+        fi
+        if [[ -n "${AAP_TOKEN}" ]]; then
+            cat >> "${output_path}" << EOF
+                        <div class="credential-item">
+                            <span class="credential-label">API Token:</span>
+                            <span class="credential-value">${AAP_TOKEN}</span>
                         </div>
 EOF
         fi

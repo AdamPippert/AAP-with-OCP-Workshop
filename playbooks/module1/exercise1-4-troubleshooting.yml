@@ -121,9 +121,9 @@
               {{ ansible_failed_result.msg }}
               
               Troubleshooting Steps:
-              1. Check kubeconfig: kubectl config current-context
-              2. Verify network connectivity: kubectl get nodes
-              3. Check authentication: kubectl auth can-i get pods
+              1. Check kubeconfig: oc config current-context
+              2. Verify network connectivity: oc get nodes
+              3. Check authentication: oc auth can-i get pods
               4. Validate cluster access: oc whoami (for OpenShift)
 
     - name: Troubleshooting Step 2 - Authentication Validation
@@ -150,9 +150,9 @@
               {{ ansible_failed_result.msg }}
               
               Common Solutions:
-              1. Token expired: kubectl config view --raw | grep token
+              1. Token expired: oc config view --raw | grep token
               2. Insufficient permissions: check RBAC bindings
-              3. Wrong context: kubectl config use-context <correct-context>
+              3. Wrong context: oc config use-context <correct-context>
               4. Missing kubeconfig: export KUBECONFIG=~/.kube/config
 
     - name: Troubleshooting Step 3 - Analyze Pod States
@@ -303,9 +303,9 @@
           {% endif %}
           
           Common Commands for Further Diagnosis:
-          - kubectl get pods --all-namespaces | grep -v Running
-          - kubectl describe pod <pod-name> -n <namespace>
-          - kubectl logs <pod-name> -n <namespace>
+          - oc get pods --all-namespaces | grep -v Running
+          - oc describe pod <pod-name> -n <namespace>
+          - oc logs <pod-name> -n <namespace>
           - ansible-inventory -i {{ inventory_file }} --list | jq
           - ansible-inventory -i {{ inventory_file }} --graph
         dest: "/tmp/inventory-diagnostic-{{ ansible_date_time.epoch }}.txt"
@@ -344,9 +344,9 @@
           ✅ Diagnostic report generation
           
           Key Diagnostic Commands:
-          - kubectl get nodes (cluster connectivity)
-          - kubectl auth can-i get pods (permissions)
-          - kubectl get pods --all-namespaces (pod health)
+          - oc get nodes (cluster connectivity)
+          - oc auth can-i get pods (permissions)
+          - oc get pods --all-namespaces (pod health)
           - ansible-inventory -i <file> --list (inventory content)
           - ansible-inventory -i <file> --graph (inventory structure)
           
