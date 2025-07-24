@@ -1,0 +1,25 @@
+---
+galaxy_info:
+  author: Red Hat Workshop Team
+  description: Role for idempotent IMS deployment management in OpenShift
+  company: Red Hat, Inc.
+  license: Apache-2.0
+  min_ansible_version: "2.12"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+  galaxy_tags:
+    - openshift
+    - kubernetes
+    - deployment  
+    - ims
+    - idempotent
+    - workshop
+
+dependencies: []
+
+collections:
+  - kubernetes.core
+  - redhat.openshift

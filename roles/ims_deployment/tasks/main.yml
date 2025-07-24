@@ -1,0 +1,31 @@
+---
+# Main tasks for IMS deployment role
+
+- name: "Validate deployment prerequisites"
+  ansible.builtin.assert:
+    that:
+      - ims_deployment_namespace is defined
+      - ims_deployment_environment in ['dev', 'test', 'prod']
+      - ims_deployment_app_name is defined
+      - ims_deployment_config.mainframe_host is defined
+    fail_msg: "Required variables missing for IMS deployment"
+    quiet: true
+
+- name: "Include namespace creation tasks"
+  ansible.builtin.include_tasks: namespace.yml
+
+- name: "Include service account creation tasks"
+  ansible.builtin.include_tasks: service_account.yml
+
+- name: "Include configuration management tasks"
+  ansible.builtin.include_tasks: configuration.yml
+
+- name: "Include deployment management tasks"
+  ansible.builtin.include_tasks: deployment.yml
+
+- name: "Include service creation tasks"
+  ansible.builtin.include_tasks: service.yml
+
+- name: "Include validation tasks"
+  ansible.builtin.include_tasks: validation.yml
+  when: ims_deployment_validation.wait_for_ready | default(true)

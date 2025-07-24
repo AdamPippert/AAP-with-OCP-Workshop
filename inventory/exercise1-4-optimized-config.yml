@@ -1,0 +1,150 @@
+# Exercise 1.4: Optimized Dynamic Inventory Configuration
+# This configuration demonstrates performance optimization and troubleshooting techniques
+
+plugin: kubernetes.core.k8s
+
+# Production-optimized multi-cluster configuration
+connections:
+  - kubeconfig: ~/.kube/config
+    context: cluster-dev
+    # Connection-specific timeout settings
+    timeout: 30
+  - kubeconfig: ~/.kube/config
+    context: cluster-test
+    timeout: 30
+  - kubeconfig: ~/.kube/config
+    context: cluster-prod
+    timeout: 60  # Longer timeout for production cluster
+
+# Optimized host composition with error handling
+compose:
+  # Primary connection target with fallback
+  ansible_host: status.podIP | default(status.hostIP) | default('unreachable')
+  
+  # Enhanced cluster identification
+  cluster_name: connection.context
+  cluster_role: >-
+    {%- if connection.context.endswith('-prod') -%}
+      production
+    {%- elif connection.context.endswith('-test') -%}
+      testing
+    {%- else -%}
+      development
+    {%- endif -%}
+  
+  # Performance and health indicators
+  pod_phase: status.phase | default('Unknown')
+  ready_status: >-
+    {%- set ready_conditions = status.conditions | selectattr('type', 'equalto', 'Ready') | list -%}
+    {%- if ready_conditions -%}
+      {{ ready_conditions[0].status }}
+    {%- else -%}
+      Unknown
+    {%- endif -%}
+  
+  # Resource utilization data
+  cpu_requests: spec.containers | map(attribute='resources.requests.cpu') | select | join(',')
+  memory_requests: spec.containers | map(attribute='resources.requests.memory') | select | join(',')
+  
+  # Troubleshooting information
+  node_name: spec.nodeName | default('unscheduled')
+  restart_count: status.containerStatuses | map(attribute='restartCount') | sum | default(0)
+  image_list: spec.containers | map(attribute='image') | join(',')
+  
+  # Last update tracking
+  resource_version: metadata.resourceVersion
+  creation_age_seconds: >-
+    {%- set created = metadata.creationTimestamp | to_datetime -%}
+    {%- set now = ansible_date_time.iso8601 | to_datetime -%}
+    {{ (now - created).total_seconds() | int }}
+
+# Production-ready grouping with error handling
+keyed_groups:
+  # Primary cluster grouping
+  - key: connection.context
+    prefix: cluster
+    separator: "_"
+  
+  # Environment-based grouping
+  - key: >-
+      {%- if connection.context.endswith('-prod') -%}
+        production
+      {%- elif connection.context.endswith('-test') -%}
+        testing
+      {%- else -%}
+        development
+      {%- endif -%}
+    prefix: env
+    separator: "_"
+  
+  # Health-based grouping for troubleshooting
+  - key: >-
+      {%- set ready_conditions = status.conditions | selectattr('type', 'equalto', 'Ready') | list -%}
+      {%- if ready_conditions and ready_conditions[0].status == 'True' -%}
+        ready
+      {%- else -%}
+        not_ready
+      {%- endif -%}
+    prefix: health
+    separator: "_"
+  
+  # Resource-based grouping
+  - key: spec.nodeName | default('unscheduled')
+    prefix: node
+    separator: "_"
+  
+  # Application grouping with fallbacks
+  - key: metadata.labels['app'] | default(metadata.labels['app.kubernetes.io/name']) | default('unlabeled')
+    prefix: app
+    separator: "_"
+  
+  # Namespace grouping
+  - key: metadata.namespace
+    prefix: ns
+    separator: "_"
+  
+  # Problem pod identification
+  - key: >-
+      {%- if (status.containerStatuses | map(attribute='restartCount') | sum | default(0)) > 5 -%}
+        high_restart
+      {%- elif status.phase != 'Running' -%}
+        not_running
+      {%- else -%}
+        healthy
+      {%- endif -%}
+    prefix: status
+    separator: "_"
+
+# Comprehensive filtering for production environments
+filters:
+  # Basic health filters
+  - status.phase is defined
+  - metadata.namespace is defined
+  - metadata.name is defined
+  
+  # Exclude system namespaces
+  - metadata.namespace not in ["kube-system", "kube-public", "kube-node-lease"]
+  - not metadata.namespace.startswith("openshift-monitoring")
+  - not metadata.namespace.startswith("openshift-logging")
+  - not metadata.namespace.startswith("openshift-operator")
+  
+  # Exclude completed and failed pods (unless investigating issues)
+  - status.phase not in ["Succeeded", "Failed"] or metadata.labels['debug'] == 'true'
+  
+  # Include only labeled pods for better organization
+  - metadata.labels is defined and metadata.labels | length > 0
+  
+  # Exclude pods in terminating state
+  - metadata.deletionTimestamp is not defined
+
+# Performance optimization settings
+cache: true
+cache_plugin: memory
+cache_timeout: 300  # 5 minutes for production
+
+# Error handling configuration
+strict: false  # Allow partial failures for large clusters
+
+# Performance tuning
+# Reduce API calls by limiting fields returned
+# This is a comment showing what could be configured in a real deployment

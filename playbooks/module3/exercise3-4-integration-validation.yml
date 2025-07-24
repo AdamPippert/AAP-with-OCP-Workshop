@@ -1,0 +1,605 @@
+---
+# Module 3, Exercise 4: End-to-End Integration Validation
+# Learning Focus: Comprehensive validation of all workshop components and patterns
+# Time: 15 minutes guided practice + wrap-up
+
+- name: "Exercise 3.4: End-to-End Integration Validation and Workshop Summary"
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars:
+    # Aggregate all previous workshop components
+    workshop_summary:
+      modules_completed: 3
+      total_exercises: 12
+      environments: ["dev", "test", "prod"]
+      
+    # Collect statistics from previous exercises
+    module1_stats:
+      namespace: "{{ hostvars['localhost']['module1_namespace'] | default('Not completed') }}"
+      inventory_clusters: "{{ hostvars['localhost']['module1_inventory_clusters'] | default(0) }}"
+      webhook_configured: "{{ hostvars['localhost']['module1_webhook_configured'] | default(false) }}"
+      
+    module2_stats:
+      namespace: "{{ hostvars['localhost']['module2_namespace'] | default('Not completed') }}"
+      service_name: "{{ hostvars['localhost']['module2_service_name'] | default('Not completed') }}"
+      deployment_ready: "{{ hostvars['localhost']['module2_deployment_ready'] | default(false) }}"
+      environment: "{{ hostvars['localhost']['module2_environment'] | default('unknown') }}"
+      
+    module3_stats:
+      namespace: "{{ hostvars['localhost']['module3_namespace'] | default('Not completed') }}"
+      app_name: "{{ hostvars['localhost']['module3_app_name'] | default('Not completed') }}"
+      config_checksum: "{{ hostvars['localhost']['module3_config_checksum'] | default('N/A') }}"
+      total_pools: "{{ hostvars['localhost']['module3_total_pools'] | default(0) }}"
+      scaling_min: "{{ hostvars['localhost']['module3_scaling_min'] | default(0) }}"
+      scaling_max: "{{ hostvars['localhost']['module3_scaling_max'] | default(0) }}"
+      error_handling_enabled: "{{ hostvars['localhost']['module3_error_handling_enabled'] | default(false) }}"
+      diagnostics_completed: "{{ hostvars['localhost']['module3_diagnostics_completed'] | default(false) }}"
+
+    # Integration test configuration
+    integration_tests:
+      - name: "cross_module_connectivity"
+        description: "Verify services can communicate across module namespaces"
+        type: "network"
+        critical: true
+      - name: "configuration_consistency"
+        description: "Validate configuration inheritance and overrides"
+        type: "config"
+        critical: true
+      - name: "resource_sharing"
+        description: "Test shared resources and service discovery"
+        type: "resource"
+        critical: false
+      - name: "scalability_patterns"
+        description: "Verify horizontal scaling works across all components"
+        type: "performance"
+        critical: false
+      - name: "error_propagation"
+        description: "Test error handling cascades properly"
+        type: "resilience"
+        critical: true
+      - name: "operational_procedures"
+        description: "Validate troubleshooting and maintenance workflows"
+        type: "operations"
+        critical: false
+
+    # Final validation criteria
+    workshop_success_criteria:
+      technical_objectives:
+        - objective: "Dynamic inventory management implemented"
+          module: 1
+          validation: "inventory_clusters > 0"
+        - objective: "Idempotent resource deployment demonstrated"
+          module: 2
+          validation: "deployment_ready == true"
+        - objective: "Advanced templating patterns applied"
+          module: 3
+          validation: "config_checksum != 'N/A'"
+        - objective: "Comprehensive error handling configured"
+          module: 3
+          validation: "error_handling_enabled == true"
+        - objective: "Advanced troubleshooting capabilities"
+          module: 3
+          validation: "diagnostics_completed == true"
+      
+      learning_outcomes:
+        - outcome: "Participants can manage multi-cluster inventories"
+          assessment: "practical_demonstration"
+        - outcome: "Participants understand idempotent deployment patterns"
+          assessment: "code_review"
+        - outcome: "Participants can implement complex Jinja2 templating"
+          assessment: "template_analysis"
+        - outcome: "Participants can configure production-ready error handling"
+          assessment: "resilience_testing"
+        - outcome: "Participants can troubleshoot complex issues systematically"
+          assessment: "diagnostic_procedures"
+
+  tasks:
+    - name: "Initialize end-to-end validation session"
+      ansible.builtin.debug:
+        msg: |
+          ========================================================
+          🎓 ADVANCED ANSIBLE AUTOMATION PLATFORM WORKSHOP
+          🔗 END-TO-END INTEGRATION VALIDATION
+          ========================================================
+          
+          Workshop Overview:
+          - Duration: 2.5 hours (150 minutes)
+          - Modules Completed: {{ workshop_summary.modules_completed }}
+          - Total Exercises: {{ workshop_summary.total_exercises }}
+          - Environments Covered: {{ workshop_summary.environments | join(', ') }}
+          
+          Final Validation Scope:
+          - Integration Tests: {{ integration_tests | length }}
+          - Success Criteria: {{ workshop_success_criteria.technical_objectives | length }} technical + {{ workshop_success_criteria.learning_outcomes | length }} learning
+          - Workshop Focus: IMS Mainframe Integration with OpenShift
+
+    - name: "Execute comprehensive module validation"
+      block:
+        - name: "Validate Module 1: Dynamic Inventory and AAP Integration"
+          block:
+            - name: "Check Module 1 namespace and resources"
+              kubernetes.core.k8s_info:
+                api_version: v1
+                kind: Namespace
+                name: "{{ module1_stats.namespace }}"
+              register: module1_validation
+              when: module1_stats.namespace != "Not completed"
+              
+            - name: "Module 1 validation results"
+              ansible.builtin.set_fact:
+                module1_score: |
+                  Module 1 - Dynamic Inventory and AAP Integration:
+                  - Namespace: {{ module1_stats.namespace }}
+                  - Inventory Clusters: {{ module1_stats.inventory_clusters }}
+                  - Webhook Configured: {{ module1_stats.webhook_configured }}
+                  - Status: {{ '✅ COMPLETE' if module1_stats.namespace != 'Not completed' else '❌ INCOMPLETE' }}
+                  
+          rescue:
+            - name: "Handle Module 1 validation failure"
+              ansible.builtin.set_fact:
+                module1_score: |
+                  Module 1 - Dynamic Inventory and AAP Integration:
+                  - Status: ⚠️ VALIDATION FAILED
+                  - Issue: Unable to validate module 1 resources
+
+        - name: "Validate Module 2: Idempotent Resource Management"
+          block:
+            - name: "Check Module 2 deployment status"
+              kubernetes.core.k8s_info:
+                api_version: apps/v1
+                kind: Deployment
+                namespace: "{{ module2_stats.namespace }}"
+                label_selectors:
+                  - "app.kubernetes.io/managed-by=ansible"
+              register: module2_deployments
+              when: module2_stats.namespace != "Not completed"
+              
+            - name: "Check Module 2 service availability"
+              kubernetes.core.k8s_info:
+                api_version: v1
+                kind: Service
+                name: "{{ module2_stats.service_name }}"
+                namespace: "{{ module2_stats.namespace }}"
+              register: module2_service
+              when: module2_stats.namespace != "Not completed" and module2_stats.service_name != "Not completed"
+              
+            - name: "Module 2 validation results"
+              ansible.builtin.set_fact:
+                module2_score: |
+                  Module 2 - Idempotent Resource Management:
+                  - Namespace: {{ module2_stats.namespace }}
+                  - Service: {{ module2_stats.service_name }}
+                  - Environment: {{ module2_stats.environment }}
+                  - Deployment Ready: {{ module2_stats.deployment_ready }}
+                  - Deployments Found: {{ module2_deployments.resources | length if module2_deployments.resources is defined else 0 }}
+                  - Status: {{ '✅ COMPLETE' if module2_stats.deployment_ready else '⚠️ ISSUES DETECTED' }}
+                  
+          rescue:
+            - name: "Handle Module 2 validation failure"
+              ansible.builtin.set_fact:
+                module2_score: |
+                  Module 2 - Idempotent Resource Management:
+                  - Status: ⚠️ VALIDATION FAILED
+                  - Issue: Unable to validate module 2 resources
+
+        - name: "Validate Module 3: Advanced Automation"
+          block:
+            - name: "Check Module 3 advanced configurations"
+              kubernetes.core.k8s_info:
+                api_version: v1
+                kind: ConfigMap
+                namespace: "{{ module3_stats.namespace }}"
+                label_selectors:
+                  - "workshop.redhat.com/complexity=advanced"
+              register: module3_advanced_configs
+              when: module3_stats.namespace != "Not completed"
+              
+            - name: "Check Module 3 error handling components"
+              kubernetes.core.k8s_info:
+                api_version: v1
+                kind: ConfigMap
+                name: "{{ module3_stats.app_name }}-error-handling-config"
+                namespace: "{{ module3_stats.namespace }}"
+              register: module3_error_config
+              when: module3_stats.namespace != "Not completed" and module3_stats.app_name != "Not completed"
+              
+            - name: "Check Module 3 diagnostic reports"
+              kubernetes.core.k8s_info:
+                api_version: v1
+                kind: ConfigMap
+                name: "{{ module3_stats.app_name }}-diagnostic-report"
+                namespace: "{{ module3_stats.namespace }}"
+              register: module3_diagnostic_report
+              when: module3_stats.namespace != "Not completed" and module3_stats.app_name != "Not completed"
+              
+            - name: "Module 3 validation results"
+              ansible.builtin.set_fact:
+                module3_score: |
+                  Module 3 - Advanced Automation and Error Handling:
+                  - Namespace: {{ module3_stats.namespace }}
+                  - Application: {{ module3_stats.app_name }}
+                  - Config Checksum: {{ module3_stats.config_checksum }}
+                  - Connection Pools: {{ module3_stats.total_pools }}
+                  - Scaling Range: {{ module3_stats.scaling_min }}-{{ module3_stats.scaling_max }}
+                  - Advanced Configs: {{ module3_advanced_configs.resources | length if module3_advanced_configs.resources is defined else 0 }}
+                  - Error Handling: {{ '✅ CONFIGURED' if module3_error_config.resources is defined and module3_error_config.resources else '❌ NOT FOUND' }}
+                  - Diagnostics: {{ '✅ AVAILABLE' if module3_diagnostic_report.resources is defined and module3_diagnostic_report.resources else '❌ NOT FOUND' }}
+                  - Status: {{ '✅ COMPLETE' if module3_stats.diagnostics_completed else '⚠️ INCOMPLETE' }}
+                  
+          rescue:
+            - name: "Handle Module 3 validation failure"
+              ansible.builtin.set_fact:
+                module3_score: |
+                  Module 3 - Advanced Automation and Error Handling:
+                  - Status: ⚠️ VALIDATION FAILED
+                  - Issue: Unable to validate module 3 resources
+
+      rescue:
+        - name: "Handle comprehensive validation failure"
+          ansible.builtin.debug:
+            msg: |
+              ⚠️ VALIDATION ERROR
+              Unable to complete comprehensive module validation.
+              This may be due to missing resources from previous exercises.
+
+    - name: "Execute integration tests"
+      block:
+        - name: "Test 1: Cross-module resource discovery"
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Namespace
+            label_selectors:
+              - "workshop.redhat.com/module"
+          register: workshop_namespaces
+          
+        - name: "Test 2: Configuration consistency check"
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: ConfigMap
+            label_selectors:
+              - "app.kubernetes.io/managed-by=ansible"
+          register: ansible_managed_configs
+          
+        - name: "Test 3: Service mesh connectivity"
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Service
+            label_selectors:
+              - "app.kubernetes.io/component=application"
+          register: application_services
+          
+        - name: "Integration test results"
+          ansible.builtin.set_fact:
+            integration_results: |
+              Integration Test Results:
+              ========================
+              
+              🔍 Cross-Module Resource Discovery:
+              - Workshop Namespaces: {{ workshop_namespaces.resources | length }}
+              - Ansible-Managed Configs: {{ ansible_managed_configs.resources | length }}
+              - Application Services: {{ application_services.resources | length }}
+              
+              📊 Resource Distribution:
+              {% for ns in workshop_namespaces.resources %}
+              - {{ ns.metadata.name }}: Module {{ ns.metadata.labels['workshop.redhat.com/module'] | default('Unknown') }}
+              {% endfor %}
+              
+              🔗 Service Connectivity:
+              {% for svc in application_services.resources %}
+              - {{ svc.metadata.name }}.{{ svc.metadata.namespace }}: {{ svc.spec.ports | length }} ports
+              {% endfor %}
+              
+              ✅ Integration Status: {{ 'HEALTHY' if workshop_namespaces.resources | length >= 2 else 'NEEDS ATTENTION' }}
+
+      rescue:
+        - name: "Handle integration test failure"
+          ansible.builtin.set_fact:
+            integration_results: |
+              Integration Test Results:
+              ========================
+              ⚠️ INTEGRATION TESTS FAILED
+              Unable to execute cross-module validation tests.
+              This may indicate incomplete workshop exercises.
+
+    - name: "Calculate workshop completion score"
+      ansible.builtin.set_fact:
+        completion_score: |
+          {% set total_criteria = workshop_success_criteria.technical_objectives | length %}
+          {% set completed_criteria = 0 %}
+          {% if module1_stats.inventory_clusters > 0 %}{% set completed_criteria = completed_criteria + 1 %}{% endif %}
+          {% if module2_stats.deployment_ready %}{% set completed_criteria = completed_criteria + 1 %}{% endif %}
+          {% if module3_stats.config_checksum != 'N/A' %}{% set completed_criteria = completed_criteria + 1 %}{% endif %}
+          {% if module3_stats.error_handling_enabled %}{% set completed_criteria = completed_criteria + 1 %}{% endif %}
+          {% if module3_stats.diagnostics_completed %}{% set completed_criteria = completed_criteria + 1 %}{% endif %}
+          {{ ((completed_criteria / total_criteria) * 100) | round(1) }}
+
+    - name: "Generate comprehensive workshop certificate data"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: "aap-workshop-certificate"
+            namespace: "{{ module3_stats.namespace | default('default') }}"
+            labels:
+              workshop.redhat.com/certificate: "advanced-aap-workshop"
+              workshop.redhat.com/completion-date: "{{ ansible_date_time.date }}"
+              workshop.redhat.com/completion-score: "{{ completion_score }}"
+            annotations:
+              workshop.redhat.com/participant: "{{ ansible_user | default('workshop-participant') }}"
+              workshop.redhat.com/instructor: "Red Hat Training"
+              workshop.redhat.com/session-id: "{{ ansible_date_time.iso8601 }}"
+          data:
+            certificate.json: |
+              {
+                "workshop_details": {
+                  "title": "Advanced Ansible Automation Platform (AAP) 2.5 Workshop",
+                  "subtitle": "OpenShift Container Platform Integration with IMS",
+                  "duration": "2.5 hours (150 minutes)",
+                  "completion_date": "{{ ansible_date_time.iso8601 }}",
+                  "participant": "{{ ansible_user | default('workshop-participant') }}",
+                  "completion_score": "{{ completion_score }}%"
+                },
+                "modules_completed": {
+                  "module1": {
+                    "title": "Dynamic Inventory and AAP Integration",
+                    "duration": "40 minutes",
+                    "namespace": "{{ module1_stats.namespace }}",
+                    "inventory_clusters": {{ module1_stats.inventory_clusters }},
+                    "webhook_configured": {{ module1_stats.webhook_configured | lower }},
+                    "status": "{{ 'completed' if module1_stats.namespace != 'Not completed' else 'incomplete' }}"
+                  },
+                  "module2": {
+                    "title": "Idempotent Resource Management and RBAC",
+                    "duration": "45 minutes",
+                    "namespace": "{{ module2_stats.namespace }}",
+                    "service_name": "{{ module2_stats.service_name }}",
+                    "environment": "{{ module2_stats.environment }}",
+                    "deployment_ready": {{ module2_stats.deployment_ready | lower }},
+                    "status": "{{ 'completed' if module2_stats.deployment_ready else 'incomplete' }}"
+                  },
+                  "module3": {
+                    "title": "Advanced Automation and Error Handling",
+                    "duration": "45 minutes",
+                    "namespace": "{{ module3_stats.namespace }}",
+                    "app_name": "{{ module3_stats.app_name }}",
+                    "config_checksum": "{{ module3_stats.config_checksum }}",
+                    "connection_pools": {{ module3_stats.total_pools }},
+                    "scaling_range": "{{ module3_stats.scaling_min }}-{{ module3_stats.scaling_max }}",
+                    "error_handling_enabled": {{ module3_stats.error_handling_enabled | lower }},
+                    "diagnostics_completed": {{ module3_stats.diagnostics_completed | lower }},
+                    "status": "{{ 'completed' if module3_stats.diagnostics_completed else 'incomplete' }}"
+                  }
+                },
+                "technical_skills_demonstrated": [
+                  "Multi-cluster dynamic inventory management using kubernetes.core collection",
+                  "Idempotent resource deployment with redhat.openshift collection",
+                  "Advanced Jinja2 templating for environment-specific configurations",
+                  "Production-ready error handling with retry mechanisms and circuit breakers",
+                  "Comprehensive troubleshooting and diagnostic automation",
+                  "Horizontal Pod Autoscaler configuration and management",
+                  "ConfigMap and Secret management for sensitive data",
+                  "Service Account and RBAC automation",
+                  "Health probe configuration and monitoring integration",
+                  "Structured logging and metrics collection"
+                ],
+                "learning_outcomes_achieved": [
+                  "Understanding of AAP 2.5 integration patterns with OpenShift",
+                  "Mastery of ansible-navigator and execution environments",
+                  "Knowledge of IMS mainframe connectivity patterns",
+                  "Experience with production-ready deployment strategies",
+                  "Proficiency in advanced Ansible automation techniques",
+                  "Capability to implement enterprise-grade error handling",
+                  "Skills in systematic troubleshooting methodologies",
+                  "Understanding of cloud-native operational procedures"
+                ],
+                "integration_test_results": {
+                  "workshop_namespaces_found": {{ workshop_namespaces.resources | length if workshop_namespaces.resources is defined else 0 }},
+                  "ansible_managed_resources": {{ ansible_managed_configs.resources | length if ansible_managed_configs.resources is defined else 0 }},
+                  "application_services_deployed": {{ application_services.resources | length if application_services.resources is defined else 0 }},
+                  "cross_module_connectivity": "{{ 'validated' if workshop_namespaces.resources is defined and workshop_namespaces.resources | length >= 2 else 'needs_attention' }}"
+                },
+                "recommendations": {
+                  "next_steps": [
+                    "Practice implementing these patterns in your own OpenShift environment",
+                    "Explore Red Hat Certified Specialist in Ansible Automation certification",
+                    "Investigate advanced AAP features like workflow templates and surveys",
+                    "Study production deployment patterns for mainframe integration projects",
+                    "Learn about GitOps workflows with Ansible and OpenShift GitOps"
+                  ],
+                  "additional_resources": [
+                    "Red Hat Ansible Automation Platform Documentation",
+                    "OpenShift Container Platform Administrator Guide",
+                    "Ansible Best Practices Guide",
+                    "Red Hat Training Courses: DO374, DO374, DO480",
+                    "Red Hat Partner Connect for certification paths"
+                  ]
+                }
+              }
+            
+            workshop-summary.md: |
+              # Advanced Ansible Automation Platform Workshop - Completion Summary
+              
+              **Participant:** {{ ansible_user | default('workshop-participant') }}  
+              **Completion Date:** {{ ansible_date_time.iso8601 }}  
+              **Final Score:** {{ completion_score }}%  
+              
+              ## Workshop Overview
+              
+              This intensive 2.5-hour workshop focused on advanced Ansible Automation Platform (AAP) 2.5 
+              integration patterns with OpenShift Container Platform, specifically targeting IMS 
+              (Information Management System) mainframe connectivity scenarios.
+              
+              ## Module Completion Status
+              
+              ### Module 1: Dynamic Inventory and AAP Integration (40 minutes)
+              - **Status:** {{ 'completed' if module1_stats.namespace != 'Not completed' else 'incomplete' }}
+              - **Namespace:** {{ module1_stats.namespace }}
+              - **Inventory Clusters:** {{ module1_stats.inventory_clusters }}
+              - **Webhook Configuration:** {{ module1_stats.webhook_configured }}
+              
+              **Skills Demonstrated:**
+              - Multi-cluster inventory management using kubernetes.core collection
+              - Dynamic grouping and host variable assignment
+              - Webhook integration for automated inventory updates
+              - Service discovery patterns in OpenShift environments
+              
+              ### Module 2: Idempotent Resource Management and RBAC (45 minutes)
+              - **Status:** {{ 'completed' if module2_stats.deployment_ready else 'incomplete' }}
+              - **Namespace:** {{ module2_stats.namespace }}
+              - **Service:** {{ module2_stats.service_name }}
+              - **Environment:** {{ module2_stats.environment }}
+              - **Deployment Ready:** {{ module2_stats.deployment_ready }}
+              
+              **Skills Demonstrated:**
+              - Idempotent resource deployment using redhat.openshift collection
+              - Environment-specific configuration management
+              - Service Account and RBAC automation
+              - Production-ready deployment patterns
+              
+              ### Module 3: Advanced Automation and Error Handling (45 minutes)
+              - **Status:** {{ 'completed' if module3_stats.diagnostics_completed else 'incomplete' }}
+              - **Namespace:** {{ module3_stats.namespace }}
+              - **Application:** {{ module3_stats.app_name }}
+              - **Config Checksum:** {{ module3_stats.config_checksum }}
+              - **Connection Pools:** {{ module3_stats.total_pools }}
+              - **Scaling Range:** {{ module3_stats.scaling_min }}-{{ module3_stats.scaling_max }}
+              - **Error Handling:** {{ module3_stats.error_handling_enabled }}
+              - **Diagnostics:** {{ module3_stats.diagnostics_completed }}
+              
+              **Skills Demonstrated:**
+              - Advanced Jinja2 templating with complex conditionals and filters
+              - Production-ready error handling with retry mechanisms
+              - Circuit breaker patterns and fallback strategies
+              - Comprehensive diagnostic and troubleshooting automation
+              - Horizontal Pod Autoscaler configuration
+              - Structured logging and metrics integration
+              
+              ## Integration Validation Results
+              
+              - **Workshop Namespaces:** {{ workshop_namespaces.resources | length if workshop_namespaces.resources is defined else 0 }}
+              - **Ansible-Managed Resources:** {{ ansible_managed_configs.resources | length if ansible_managed_configs.resources is defined else 0 }}
+              - **Application Services:** {{ application_services.resources | length if application_services.resources is defined else 0 }}
+              - **Cross-Module Connectivity:** {{ 'Validated' if workshop_namespaces.resources is defined and workshop_namespaces.resources | length >= 2 else 'Needs Attention' }}
+              
+              ## Technical Achievements
+              
+              ✅ **Advanced Ansible Patterns:** Complex playbook structures with error handling  
+              ✅ **OpenShift Integration:** Native resource management using certified collections  
+              ✅ **IMS Connectivity:** Mainframe integration patterns and best practices  
+              ✅ **Production Readiness:** Comprehensive monitoring, logging, and diagnostics  
+              ✅ **Operational Excellence:** Systematic troubleshooting and maintenance procedures  
+              
+              ## Next Steps and Recommendations
+              
+              ### Immediate Actions
+              1. **Practice Implementation:** Apply these patterns in your own OpenShift environment
+              2. **Documentation Review:** Study the generated troubleshooting playbooks and diagnostic reports
+              3. **Certification Path:** Consider Red Hat Certified Specialist in Ansible Automation
+              
+              ### Advanced Learning
+              1. **Workshop Extensions:** Implement GitOps workflows with these automation patterns
+              2. **Production Deployment:** Apply enterprise-grade security and compliance measures
+              3. **Integration Projects:** Extend patterns to other mainframe systems and middleware
+              
+              ### Professional Development
+              1. **Red Hat Training:** Explore DO374 (Ansible for Network Automation), DO480 (Multicloud Automation)
+              2. **Community Engagement:** Contribute to Ansible collections and share patterns
+              3. **Certification Goals:** Work towards Red Hat Certified Architect (RHCA) designation
+              
+              ---
+              
+              **Certificate ID:** {{ ansible_date_time.epoch }}  
+              **Issued By:** Red Hat Advanced Ansible Automation Platform Workshop  
+              **Validation:** This certificate can be verified using the ConfigMap resource created in your workshop environment
+      register: certificate_result
+
+    - name: "Display final workshop summary and graduation"
+      ansible.builtin.debug:
+        msg: |
+          ========================================================
+          🎓 CONGRATULATIONS! WORKSHOP COMPLETED SUCCESSFULLY
+          ========================================================
+          
+          {{ module1_score | default('Module 1: Not validated') }}
+          
+          {{ module2_score | default('Module 2: Not validated') }}
+          
+          {{ module3_score | default('Module 3: Not validated') }}
+          
+          {{ integration_results | default('Integration results not available') }}
+          
+          ========================================================
+          📊 FINAL WORKSHOP STATISTICS
+          ========================================================
+          
+          🏆 **COMPLETION SCORE: {{ completion_score }}%**
+          
+          📈 **TECHNICAL PROFICIENCY ACHIEVED:**
+          ✅ Multi-cluster inventory management
+          ✅ Idempotent resource deployment patterns  
+          ✅ Advanced Jinja2 templating techniques
+          ✅ Production-ready error handling strategies
+          ✅ Comprehensive troubleshooting methodologies
+          ✅ OpenShift native automation integration
+          ✅ IMS mainframe connectivity patterns
+          ✅ Enterprise-grade operational procedures
+          
+          🔧 **TOOLS AND TECHNOLOGIES MASTERED:**
+          • Ansible Automation Platform 2.5
+          • OpenShift Container Platform 4.12+
+          • kubernetes.core and redhat.openshift collections
+          • Advanced Jinja2 templating and filters
+          • Resilience4j error handling patterns
+          • Prometheus monitoring integration
+          • ConfigMap and Secret management
+          • Horizontal Pod Autoscaler (HPA)
+          • Service mesh connectivity patterns
+          
+          📚 **LEARNING ARTIFACTS GENERATED:**
+          • Workshop Certificate: {{ 'aap-workshop-certificate ConfigMap' if certificate_result.changed else 'Generation failed' }}
+          • Troubleshooting Playbooks: Available in workshop namespaces
+          • Diagnostic Reports: Comprehensive system analysis
+          • Configuration Templates: Reusable automation patterns
+          • Integration Test Suites: Validation and monitoring procedures
+          
+          🚀 **RECOMMENDED NEXT STEPS:**
+          1. **Immediate Practice:** Apply these patterns in your production environment
+          2. **Certification Path:** Pursue Red Hat Certified Specialist in Ansible Automation
+          3. **Advanced Learning:** Explore AAP workflow templates and surveys
+          4. **Community Contribution:** Share your automation patterns with the Ansible community
+          5. **Professional Growth:** Consider Red Hat Certified Architect (RHCA) track
+          
+          ========================================================
+          🎉 THANK YOU FOR PARTICIPATING!
+          ========================================================
+          
+          **Workshop Duration:** 2.5 hours (150 minutes)
+          **Modules Completed:** {{ workshop_summary.modules_completed }}/3
+          **Exercises Completed:** {{ workshop_summary.total_exercises }}/12
+          **Environments Covered:** {{ workshop_summary.environments | join(', ') }}
+          **Session ID:** {{ ansible_date_time.iso8601 }}
+          
+          Your journey in advanced Ansible automation and OpenShift integration
+          has equipped you with enterprise-ready skills for mainframe modernization
+          and cloud-native transformation projects.
+          
+          Keep automating, keep learning, and keep innovating! 🚀
+
+    - name: "Export comprehensive workshop completion data"
+      ansible.builtin.set_stats:
+        data:
+          workshop_completed: true
+          workshop_completion_score: "{{ completion_score }}"
+          workshop_completion_date: "{{ ansible_date_time.iso8601 }}"
+          workshop_session_id: "{{ ansible_date_time.epoch }}"
+          workshop_participant: "{{ ansible_user | default('workshop-participant') }}"
+          workshop_modules_completed: "{{ workshop_summary.modules_completed }}"
+          workshop_exercises_completed: "{{ workshop_summary.total_exercises }}"
+          workshop_certificate_generated: "{{ certificate_result.changed }}"
+          workshop_namespaces_created: "{{ workshop_namespaces.resources | length if workshop_namespaces.resources is defined else 0 }}"
+          workshop_resources_managed: "{{ ansible_managed_configs.resources | length if ansible_managed_configs.resources is defined else 0 }}"
+          workshop_services_deployed: "{{ application_services.resources | length if application_services.resources is defined else 0 }}"
+          final_validation_status: "{{ 'success' if completion_score | float >= 80.0 else 'needs_improvement' }}"

@@ -1,0 +1,99 @@
+---
+# Default variables for IMS deployment role
+
+# Application configuration
+ims_deployment_app_name: "{{ app_name | default('ims-connector') }}"
+ims_deployment_app_version: "{{ app_version | default('1.0.0') }}"
+ims_deployment_namespace: "{{ workshop_namespace | default('ims-workshop') }}"
+ims_deployment_environment: "{{ workshop_environment | default('dev') }}"
+
+# Service account configuration
+ims_deployment_service_account: "{{ service_account_name | default('ims-connector-sa') }}"
+
+# IMS-specific configuration
+ims_deployment_config:
+  mainframe_host: "{{ ims_mainframe_host | default('mainframe.example.com') }}"
+  connection_pool_size: "{{ ims_pool_size | default(10) }}"
+  timeout_seconds: "{{ ims_timeout | default(30) }}"
+  database_name: "{{ ims_database | default('IMSDB01') }}"
+
+# Resource specifications by environment
+ims_deployment_resource_specs:
+  dev:
+    replicas: 1
+    cpu_request: "100m"
+    cpu_limit: "500m"
+    memory_request: "128Mi"
+    memory_limit: "512Mi"
+  test:
+    replicas: 2
+    cpu_request: "200m"
+    cpu_limit: "1000m"
+    memory_request: "256Mi"
+    memory_limit: "1Gi"
+  prod:
+    replicas: 3
+    cpu_request: "500m"
+    cpu_limit: "2000m"
+    memory_request: "512Mi"
+    memory_limit: "2Gi"
+
+# Container image configuration
+ims_deployment_image:
+  registry: "registry.redhat.io"
+  repository: "ubi8/openjdk-11"
+  tag: "latest"
+  pull_policy: "Always"
+
+# Security context configuration
+ims_deployment_security:
+  run_as_non_root: true
+  run_as_user: 1001
+  fs_group: 1001
+
+# Probe configuration
+ims_deployment_probes:
+  liveness:
+    http_get:
+      path: "/actuator/health"
+      port: 8080
+    initial_delay_seconds: 60
+    period_seconds: 30
+    timeout_seconds: 10
+    failure_threshold: 3
+  readiness:
+    http_get:
+      path: "/actuator/health/readiness"
+      port: 8080
+    initial_delay_seconds: 30
+    period_seconds: 10
+    timeout_seconds: 5
+    failure_threshold: 3
+
+# Service configuration
+ims_deployment_service:
+  type: "ClusterIP"
+  port: 8080
+  target_port: "http"
+  protocol: "TCP"
+
+# Labels applied to all resources
+ims_deployment_labels:
+  app.kubernetes.io/managed-by: "ansible"
+  app.kubernetes.io/part-of: "ims-workshop"
+
+# Annotations applied to resources
+ims_deployment_annotations:
+  description: "IMS connector service for mainframe integration"
+
+# Rollback configuration
+ims_deployment_rollback:
+  enabled: true
+  max_attempts: 3
+  timeout_seconds: 300
+
+# Validation configuration
+ims_deployment_validation:
+  wait_for_ready: true
+  wait_timeout: 300
+  health_check_enabled: true

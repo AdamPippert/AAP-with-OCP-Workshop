@@ -1,0 +1,361 @@
+---
+# Exercise 1.4: Troubleshooting and Optimization
+# This playbook demonstrates systematic troubleshooting of inventory issues
+
+- name: Inventory Troubleshooting and Optimization
+  hosts: localhost
+  gather_facts: false
+  vars:
+    inventory_file: "inventory/exercise1-4-optimized-config.yml"
+    troubleshooting_namespace: "ims-troubleshooting"
+    
+  tasks:
+    - name: Display exercise information
+      debug:
+        msg: |
+          Exercise 1.4: Troubleshooting and Optimization
+          =============================================
+          
+          This exercise covers systematic approaches to diagnosing and
+          resolving common dynamic inventory issues in production environments.
+          
+          Scenarios covered:
+          1. Authentication token expiration
+          2. Network connectivity timeouts  
+          3. Resource permission errors
+          4. Large cluster performance issues
+          5. Invalid kubeconfig contexts
+
+    - name: Create troubleshooting namespace and resources
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{ troubleshooting_namespace }}"
+            labels:
+              purpose: troubleshooting
+              exercise: "1-4"
+
+    - name: Scenario 1 - Create healthy pods for baseline
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: "healthy-pod-{{ item }}"
+            namespace: "{{ troubleshooting_namespace }}"
+            labels:
+              app: healthy-app
+              status: healthy
+              exercise: "1-4"
+          spec:
+            containers:
+            - name: app
+              image: busybox:latest
+              command: ['sleep', '600']
+            restartPolicy: Never
+      loop:
+        - 1
+        - 2
+      register: healthy_pods
+
+    - name: Scenario 2 - Create problematic pods for troubleshooting
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: "problem-pod-{{ item.name }}"
+            namespace: "{{ troubleshooting_namespace }}"
+            labels:
+              app: problem-app
+              issue-type: "{{ item.issue_type }}"
+              exercise: "1-4"
+          spec:
+            containers:
+            - name: app
+              image: "{{ item.image }}"
+              command: "{{ item.command }}"
+            restartPolicy: "{{ item.restart_policy }}"
+      loop:
+        - name: "crashloop"
+          image: "busybox:latest"
+          command: ['sh', '-c', 'exit 1']
+          restart_policy: "Always"
+          issue_type: "crashloop"
+        - name: "imagepull"
+          image: "nonexistent-image:latest"
+          command: ['sleep', '600']
+          restart_policy: "Never"
+          issue_type: "imagepull"
+      register: problem_pods
+      ignore_errors: true
+
+    - name: Wait for pods to reach their expected states
+      pause:
+        seconds: 30
+        prompt: "Waiting for pods to reach their states for troubleshooting..."
+
+    - name: Troubleshooting Step 1 - Basic Connectivity Test
+      block:
+        - name: Test cluster connectivity
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Node
+          register: node_connectivity
+          
+        - name: Display connectivity results
+          debug:
+            msg: |
+              Cluster Connectivity Test:
+              ========================
+              - Nodes accessible: {{ node_connectivity.resources | length }}
+              - Cluster reachable: {{ 'Yes' if node_connectivity.resources else 'No' }}
+              
+      rescue:
+        - name: Connectivity troubleshooting
+          debug:
+            msg: |
+              ❌ Cluster Connectivity Issue Detected:
+              {{ ansible_failed_result.msg }}
+              
+              Troubleshooting Steps:
+              1. Check kubeconfig: kubectl config current-context
+              2. Verify network connectivity: kubectl get nodes
+              3. Check authentication: kubectl auth can-i get pods
+              4. Validate cluster access: oc whoami (for OpenShift)
+
+    - name: Troubleshooting Step 2 - Authentication Validation
+      block:
+        - name: Test service account permissions
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: ServiceAccount
+            namespace: default
+          register: auth_test
+          
+        - name: Test pod listing permissions
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Pod
+            namespace: "{{ troubleshooting_namespace }}"
+          register: pod_list_test
+          
+      rescue:
+        - name: Authentication troubleshooting guidance
+          debug:
+            msg: |
+              ❌ Authentication Issue Detected:
+              {{ ansible_failed_result.msg }}
+              
+              Common Solutions:
+              1. Token expired: kubectl config view --raw | grep token
+              2. Insufficient permissions: check RBAC bindings
+              3. Wrong context: kubectl config use-context <correct-context>
+              4. Missing kubeconfig: export KUBECONFIG=~/.kube/config
+
+    - name: Troubleshooting Step 3 - Analyze Pod States
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: "{{ troubleshooting_namespace }}"
+      register: all_troubleshooting_pods
+
+    - name: Analyze pod health status
+      set_fact:
+        healthy_pods_count: >-
+          {{ all_troubleshooting_pods.resources | 
+             selectattr('status.phase', 'equalto', 'Running') | 
+             list | length }}
+        failed_pods: >-
+          {{ all_troubleshooting_pods.resources | 
+             selectattr('status.phase', 'in', ['Failed', 'Pending']) | 
+             list }}
+        crashloop_pods: >-
+          {{ all_troubleshooting_pods.resources | 
+             selectattr('status.containerStatuses', 'defined') |
+             selectattr('status.containerStatuses.0.restartCount', 'greaterthan', 0) | 
+             list }}
+
+    - name: Display pod analysis results
+      debug:
+        msg: |
+          Pod Health Analysis:
+          ===================
+          - Total pods: {{ all_troubleshooting_pods.resources | length }}
+          - Healthy (Running): {{ healthy_pods_count }}
+          - Failed/Pending: {{ failed_pods | length }}
+          - Crashlooping: {{ crashloop_pods | length }}
+          
+          Failed Pods Details:
+          {% for pod in failed_pods %}
+          - {{ pod.metadata.name }}: {{ pod.status.phase }}
+            {% if pod.status.containerStatuses is defined %}
+            Container Status: {{ pod.status.containerStatuses[0].state | to_nice_json }}
+            {% endif %}
+          {% endfor %}
+
+    - name: Troubleshooting Step 4 - Performance Optimization Test
+      block:
+        - name: Test inventory performance with timing
+          shell: |
+            time ansible-inventory -i {{ inventory_file }} --list > /dev/null
+          register: inventory_performance
+          
+        - name: Analyze inventory size and performance
+          shell: |
+            ansible-inventory -i {{ inventory_file }} --list | jq '. | length'
+          register: inventory_size
+          ignore_errors: true
+          
+        - name: Display performance metrics
+          debug:
+            msg: |
+              Inventory Performance Metrics:
+              =============================
+              - Execution time: {{ inventory_performance.stderr.split('real')[1].split('user')[0].strip() | default('N/A') }}
+              - Inventory groups: {{ inventory_size.stdout | default('Unable to determine') }}
+              
+              Performance Optimization Tips:
+              - Use caching (cache: true, cache_timeout: 300)
+              - Add specific filters to reduce resource queries
+              - Optimize keyed_groups to avoid expensive operations
+              - Consider multiple smaller inventory files vs one large file
+
+      rescue:
+        - name: Performance troubleshooting guidance
+          debug:
+            msg: |
+              ❌ Performance Issue Detected:
+              
+              Common causes and solutions:
+              1. Large clusters: Implement filtering and caching
+              2. Complex keyed_groups: Simplify grouping logic
+              3. Network latency: Increase timeout values
+              4. Too many clusters: Consider inventory partitioning
+
+    - name: Troubleshooting Step 5 - Test Inventory Grouping
+      block:
+        - name: Test inventory groups creation
+          shell: |
+            ansible-inventory -i {{ inventory_file }} --graph | head -20
+          register: inventory_groups
+          
+        - name: Validate expected groups exist
+          shell: |
+            ansible-inventory -i {{ inventory_file }} --list | jq 'keys[]' | grep -E '^(cluster_|env_|health_|app_)'
+          register: expected_groups
+          ignore_errors: true
+          
+        - name: Display grouping results
+          debug:
+            msg: |
+              Inventory Grouping Analysis:
+              ===========================
+              
+              Group Structure:
+              {{ inventory_groups.stdout }}
+              
+              Dynamic Groups Found:
+              {{ expected_groups.stdout_lines | default(['No dynamic groups found']) | join('\n') }}
+
+      rescue:
+        - name: Grouping troubleshooting guidance
+          debug:
+            msg: |
+              ❌ Inventory Grouping Issue:
+              
+              Check for:
+              1. Syntax errors in keyed_groups configuration
+              2. Missing or malformed metadata on resources
+              3. Jinja2 template errors in compose sections
+              4. Incorrect filter logic excluding expected resources
+
+    - name: Troubleshooting Step 6 - Create Diagnostic Report
+      copy:
+        content: |
+          IMS Dynamic Inventory Diagnostic Report
+          ======================================
+          Generated: {{ ansible_date_time.iso8601 }}
+          
+          Cluster Connectivity: {{ 'OK' if node_connectivity.resources is defined else 'FAILED' }}
+          Authentication: {{ 'OK' if auth_test is succeeded else 'FAILED' }}
+          
+          Pod Health Summary:
+          - Total pods analyzed: {{ all_troubleshooting_pods.resources | length }}
+          - Healthy pods: {{ healthy_pods_count }}
+          - Problem pods: {{ (failed_pods | length) + (crashloop_pods | length) }}
+          
+          Performance Metrics:
+          - Inventory execution time: {{ inventory_performance.stderr.split('real')[1].split('user')[0].strip() | default('N/A') }}
+          - Groups created: {{ expected_groups.stdout_lines | default([]) | length }}
+          
+          Recommendations:
+          {% if (failed_pods | length) > 0 %}
+          - Investigate {{ failed_pods | length }} failed pods
+          {% endif %}
+          {% if (crashloop_pods | length) > 0 %}
+          - Fix {{ crashloop_pods | length }} crashlooping pods
+          {% endif %}
+          {% if healthy_pods_count == 0 %}
+          - No healthy pods found - check cluster state and filters
+          {% endif %}
+          
+          Common Commands for Further Diagnosis:
+          - kubectl get pods --all-namespaces | grep -v Running
+          - kubectl describe pod <pod-name> -n <namespace>
+          - kubectl logs <pod-name> -n <namespace>
+          - ansible-inventory -i {{ inventory_file }} --list | jq
+          - ansible-inventory -i {{ inventory_file }} --graph
+        dest: "/tmp/inventory-diagnostic-{{ ansible_date_time.epoch }}.txt"
+      register: diagnostic_report
+
+    - name: Validation checkpoint
+      assert:
+        that:
+          - node_connectivity.resources is defined
+          - all_troubleshooting_pods.resources | length > 0
+          - diagnostic_report is succeeded
+        success_msg: "✅ Exercise 1.4 validation successful - troubleshooting tools and techniques demonstrated"
+        fail_msg: "❌ Exercise 1.4 validation failed - review troubleshooting steps and cluster configuration"
+
+    - name: Clean up troubleshooting resources
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Namespace
+        name: "{{ troubleshooting_namespace }}"
+        state: absent
+        wait: true
+        wait_timeout: 120
+
+    - name: Exercise completion summary
+      debug:
+        msg: |
+          🎉 Exercise 1.4 Complete!
+          
+          Troubleshooting Skills Developed:
+          ================================
+          ✅ Cluster connectivity validation
+          ✅ Authentication and permissions testing
+          ✅ Pod health analysis and diagnosis
+          ✅ Performance measurement and optimization
+          ✅ Inventory grouping verification
+          ✅ Diagnostic report generation
+          
+          Key Diagnostic Commands:
+          - kubectl get nodes (cluster connectivity)
+          - kubectl auth can-i get pods (permissions)
+          - kubectl get pods --all-namespaces (pod health)
+          - ansible-inventory -i <file> --list (inventory content)
+          - ansible-inventory -i <file> --graph (inventory structure)
+          
+          Diagnostic Report: {{ diagnostic_report.dest }}
+          
+          Module 1 Complete! 🚀
+          You now have production-ready dynamic inventory skills for:
+          - Single and multi-cluster OpenShift environments
+          - Event-driven inventory synchronization
+          - Systematic troubleshooting and optimization
+          
+          Ready to proceed to Module 2: Idempotent Resource Management and RBAC!

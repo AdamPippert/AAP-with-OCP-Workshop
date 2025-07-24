@@ -1,0 +1,61 @@
+---
+# Tasks for creating ClusterRoleBindings
+
+- name: "Create ClusterRoleBindings for cluster-level access"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: "{{ item.name }}-cluster-{{ ims_rbac_namespace }}"
+        labels: "{{ ims_rbac_labels | combine({'workshop.redhat.com/namespace': ims_rbac_namespace}) }}"
+        annotations: "{{ ims_rbac_annotations | combine({'description': 'Cluster role binding for ' + item.name + ' in ' + ims_rbac_namespace}) }}"
+      subjects:
+      - kind: ServiceAccount
+        name: "{{ item.name }}"
+        namespace: "{{ ims_rbac_namespace }}"
+      roleRef:
+        kind: ClusterRole
+        name: "{{ ims_rbac_cluster_role.name }}"
+        apiGroup: rbac.authorization.k8s.io
+  loop: "{{ ims_rbac_service_accounts }}"
+  when: 
+    - item.environments is not defined or ims_rbac_environment in item.environments
+    - item.role_type in ['operator', 'admin']
+  register: ims_cluster_bindings_result
+
+- name: "Create ClusterRoleBindings for built-in cluster roles"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: "{{ item.name }}-{{ role_name }}-{{ ims_rbac_namespace }}"
+        labels: "{{ ims_rbac_labels | combine({'workshop.redhat.com/namespace': ims_rbac_namespace}) }}"
+        annotations: "{{ ims_rbac_annotations | combine({'description': role_name + ' cluster role binding for ' + item.name}) }}"
+      subjects:
+      - kind: ServiceAccount
+        name: "{{ item.name }}"
+        namespace: "{{ ims_rbac_namespace }}"
+      roleRef:
+        kind: ClusterRole
+        name: "{{ role_name }}"
+        apiGroup: rbac.authorization.k8s.io
+  loop: "{{ ims_rbac_service_accounts | product(ims_rbac_profiles[ims_rbac_environment].cluster_roles) | list }}"
+  vars:
+    role_name: "{{ item.1 }}"
+  when: 
+    - item.0.environments is not defined or ims_rbac_environment in item.0.environments
+    - ims_rbac_profiles[ims_rbac_environment].cluster_roles | length > 0
+    - item.0.role_type in ['operator', 'admin']
+  register: ims_builtin_cluster_bindings_result
+
+- name: "Display ClusterRoleBinding creation status"
+  ansible.builtin.debug:
+    msg: |
+      ClusterRoleBindings created/updated:
+      - Custom cluster role bindings: {{ ims_cluster_bindings_result.results | selectattr('changed', 'defined') | selectattr('changed') | list | length }}
+      - Built-in cluster role bindings: {{ ims_builtin_cluster_bindings_result.results | selectattr('changed', 'defined') | selectattr('changed') | list | length }}
+    verbosity: 1

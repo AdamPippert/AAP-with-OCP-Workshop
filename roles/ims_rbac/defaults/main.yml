@@ -1,0 +1,93 @@
+---
+# Default variables for IMS RBAC role
+
+# Target namespace for RBAC resources
+ims_rbac_namespace: "{{ workshop_namespace | default('ims-workshop') }}"
+
+# Environment-specific RBAC profiles
+ims_rbac_environment: "{{ workshop_environment | default('dev') }}"
+
+# Service account definitions
+ims_rbac_service_accounts:
+  - name: "ims-reader"
+    description: "Read-only access for IMS monitoring services"
+    role_type: "reader"
+    environments: ["dev", "test", "prod"]
+  - name: "ims-operator"
+    description: "Operational access for IMS maintenance tasks"
+    role_type: "operator"
+    environments: ["dev", "test", "prod"]
+  - name: "ims-admin"
+    description: "Administrative access for IMS deployment management"
+    role_type: "admin"
+    environments: ["dev"]
+
+# RBAC profiles by environment
+ims_rbac_profiles:
+  dev:
+    cluster_roles:
+      - view
+    namespace_roles:
+      - edit
+    custom_permissions:
+      - pods/log
+      - pods/exec
+    create_tokens: true
+    scc_required: false
+  test:
+    cluster_roles:
+      - view
+    namespace_roles:
+      - view
+    custom_permissions:
+      - pods/log
+    create_tokens: true
+    scc_required: false
+  prod:
+    cluster_roles: []
+    namespace_roles:
+      - view
+    custom_permissions:
+      - pods/log
+    create_tokens: false
+    scc_required: true
+
+# Custom ClusterRole configuration
+ims_rbac_cluster_role:
+  name: "ims-cluster-operations"
+  description: "Custom cluster role for IMS-specific operations"
+  create: true
+
+# Custom namespace Role configuration
+ims_rbac_namespace_role:
+  name: "ims-namespace-operations"
+  description: "Custom role for IMS namespace operations"
+  create: true
+
+# SecurityContextConstraints configuration
+ims_rbac_scc:
+  name: "ims-restricted-scc"
+  description: "Custom SCC for IMS workloads with mainframe connectivity requirements"
+  create_for_prod: true
+  uid_range:
+    min: 1000
+    max: 2000
+  fsgroup_range:
+    min: 1000
+    max: 2000
+
+# Token management
+ims_rbac_token_management:
+  create_tokens: "{{ ims_rbac_profiles[ims_rbac_environment].create_tokens | default(false) }}"
+  token_roles: ["operator", "admin"]
+
+# Labels applied to all RBAC resources
+ims_rbac_labels:
+  app.kubernetes.io/managed-by: "ansible"
+  workshop.redhat.com/module: "module2"
+  workshop.redhat.com/component: "rbac"
+
+# Annotations applied to RBAC resources
+ims_rbac_annotations:
+  description: "IMS RBAC resources managed by Ansible"
+  workshop.redhat.com/created-by: "{{ ansible_user | default('workshop-user') }}"

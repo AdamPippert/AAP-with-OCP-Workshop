@@ -1,0 +1,52 @@
+---
+# Tasks for token management
+
+- name: "Generate service account tokens for external access"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ item.name }}-token"
+        namespace: "{{ ims_rbac_namespace }}"
+        labels: "{{ ims_rbac_labels }}"
+        annotations: "{{ ims_rbac_annotations | combine({
+          'kubernetes.io/service-account.name': item.name,
+          'description': 'Token for ' + item.name + ' service account'
+        }) }}"
+      type: kubernetes.io/service-account-token
+  loop: "{{ ims_rbac_service_accounts }}"
+  when: 
+    - item.environments is not defined or ims_rbac_environment in item.environments
+    - item.role_type in ims_rbac_token_management.token_roles
+  register: ims_tokens_result
+
+- name: "Wait for tokens to be generated"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: "{{ item.name }}-token"
+    namespace: "{{ ims_rbac_namespace }}"
+    wait: true
+    wait_condition:
+      type: Complete
+      status: "True"
+    wait_timeout: 60
+  loop: "{{ ims_rbac_service_accounts }}"
+  when: 
+    - item.environments is not defined or ims_rbac_environment in item.environments
+    - item.role_type in ims_rbac_token_management.token_roles
+  ignore_errors: true
+  register: ims_token_wait_result
+
+- name: "Display token creation status"
+  ansible.builtin.debug:
+    msg: |
+      Service Account Tokens:
+      {% for item in ims_tokens_result.results %}
+      {% if not item.skipped | default(false) %}
+      - {{ item.result.metadata.name }}: {{ 'Created' if item.changed else 'Already exists' }}
+      {% endif %}
+      {% endfor %}
+    verbosity: 1

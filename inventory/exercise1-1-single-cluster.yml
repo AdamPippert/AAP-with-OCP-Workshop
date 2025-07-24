@@ -1,0 +1,55 @@
+# Exercise 1.1: Single-Cluster Dynamic Inventory
+# This inventory configuration demonstrates basic OpenShift service discovery
+# using the kubernetes.core.k8s inventory plugin
+
+plugin: kubernetes.core.k8s
+
+# Connection configuration for single OpenShift cluster
+connections:
+  - kubeconfig: ~/.kube/config
+    context: cluster-dev  # Update this to match your cluster context name
+
+# Configure how inventory hostnames are generated
+compose:
+  # Use pod IP as the ansible connection target
+  ansible_host: status.podIP | default('unknown')
+  # Add cluster information to host variables
+  cluster_name: "'cluster-dev'"
+  pod_phase: status.phase | default('Unknown')
+  node_name: spec.nodeName | default('unscheduled')
+
+# Create dynamic groups based on Kubernetes metadata
+keyed_groups:
+  # Group pods by namespace
+  - key: metadata.namespace
+    prefix: namespace
+    separator: "_"
+  
+  # Group pods by application label
+  - key: metadata.labels['app']
+    prefix: app
+    separator: "_"
+    
+  # Group pods by deployment owner
+  - key: metadata.ownerReferences[0].name
+    prefix: deployment
+    separator: "_"
+  
+  # Group pods by node
+  - key: spec.nodeName
+    prefix: node
+    separator: "_"
+
+# Only include running pods to avoid connection issues
+filters:
+  - status.phase == "Running"
+  - metadata.namespace != "kube-system"  # Skip system pods
+  - metadata.namespace != "openshift-monitoring"  # Skip monitoring pods
+
+# Cache configuration for better performance
+cache: true
+cache_plugin: memory
+cache_timeout: 300  # 5 minutes
+
+# Enable strict mode for better error reporting
+strict: false

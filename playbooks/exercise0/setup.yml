@@ -1,0 +1,241 @@
+---
+- name: "Exercise 0: Initial Workshop Environment Setup"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    workshop_namespace: "workshop-aap"
+    service_account_name: "workshop-automation"
+    
+  tasks:
+    - name: Verify OpenShift connectivity
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: default
+      register: cluster_info
+      
+    - name: Display cluster connection status
+      ansible.builtin.debug:
+        msg: "Successfully connected to OpenShift cluster"
+        
+    - name: Ensure workshop namespace exists
+      kubernetes.core.k8s:
+        name: "{{ workshop_namespace }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+        
+    - name: Create workshop service account
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: "{{ service_account_name }}"
+            namespace: "{{ workshop_namespace }}"
+            
+    - name: Create cluster role for workshop automation
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRole
+          metadata:
+            name: workshop-automation-role
+          rules:
+            - apiGroups: [""]
+              resources: ["namespaces", "pods", "services", "configmaps", "secrets"]
+              verbs: ["get", "list", "create", "update", "patch", "delete"]
+            - apiGroups: ["apps"]
+              resources: ["deployments", "replicasets"]
+              verbs: ["get", "list", "create", "update", "patch", "delete"]
+            - apiGroups: ["route.openshift.io"]
+              resources: ["routes"]
+              verbs: ["get", "list", "create", "update", "patch", "delete"]
+            - apiGroups: ["security.openshift.io"]
+              resources: ["securitycontextconstraints"]
+              verbs: ["get", "list", "use"]
+              
+    - name: Bind cluster role to service account
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: workshop-automation-binding
+          subjects:
+            - kind: ServiceAccount
+              name: "{{ service_account_name }}"
+              namespace: "{{ workshop_namespace }}"
+          roleRef:
+            kind: ClusterRole
+            name: workshop-automation-role
+            apiGroup: rbac.authorization.k8s.io
+            
+    - name: Create resource quotas for workshop namespaces
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ResourceQuota
+          metadata:
+            name: workshop-quota
+            namespace: "{{ workshop_namespace }}"
+          spec:
+            hard:
+              requests.cpu: "16"
+              requests.memory: "32Gi"
+              limits.cpu: "32"
+              limits.memory: "64Gi"
+              pods: "50"
+              services: "20"
+              persistentvolumeclaims: "10"
+              
+    - name: Create dev environment namespace
+      kubernetes.core.k8s:
+        name: "{{ workshop_namespace }}-dev"
+        api_version: v1
+        kind: Namespace
+        state: present
+        
+    - name: Create test environment namespace  
+      kubernetes.core.k8s:
+        name: "{{ workshop_namespace }}-test"
+        api_version: v1
+        kind: Namespace
+        state: present
+        
+    - name: Create prod environment namespace
+      kubernetes.core.k8s:
+        name: "{{ workshop_namespace }}-prod"
+        api_version: v1
+        kind: Namespace
+        state: present
+        
+    - name: Apply resource quotas to dev environment
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ResourceQuota
+          metadata:
+            name: dev-quota
+            namespace: "{{ workshop_namespace }}-dev"
+          spec:
+            hard:
+              requests.cpu: "4"
+              requests.memory: "8Gi"
+              limits.cpu: "8"
+              limits.memory: "16Gi"
+              
+    - name: Apply resource quotas to test environment
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ResourceQuota
+          metadata:
+            name: test-quota
+            namespace: "{{ workshop_namespace }}-test"
+          spec:
+            hard:
+              requests.cpu: "8"
+              requests.memory: "16Gi"
+              limits.cpu: "16"
+              limits.memory: "32Gi"
+              
+    - name: Apply resource quotas to prod environment
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ResourceQuota
+          metadata:
+            name: prod-quota
+            namespace: "{{ workshop_namespace }}-prod"
+          spec:
+            hard:
+              requests.cpu: "16"
+              requests.memory: "32Gi"
+              limits.cpu: "32"
+              limits.memory: "64Gi"
+              
+    - name: Create network policies for environment isolation
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: "{{ item }}-isolation"
+            namespace: "{{ workshop_namespace }}-{{ item }}"
+          spec:
+            podSelector: {}
+            policyTypes:
+              - Ingress
+              - Egress
+            ingress:
+              - from:
+                  - namespaceSelector:
+                      matchLabels:
+                        name: "{{ workshop_namespace }}-{{ item }}"
+            egress:
+              - to:
+                  - namespaceSelector:
+                      matchLabels:
+                        name: "{{ workshop_namespace }}-{{ item }}"
+      loop:
+        - dev
+        - test 
+        - prod
+        
+    - name: Label environment namespaces
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{ workshop_namespace }}-{{ item }}"
+            labels:
+              name: "{{ workshop_namespace }}-{{ item }}"
+              environment: "{{ item }}"
+              workshop: "aap-ocp-integration"
+      loop:
+        - dev
+        - test
+        - prod
+        
+    - name: Create workshop ConfigMap with environment details
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: workshop-config
+            namespace: "{{ workshop_namespace }}"
+          data:
+            workshop_name: "Advanced AAP with OCP Integration"
+            workshop_version: "2.5"
+            environments: "dev,test,prod"
+            service_account: "{{ service_account_name }}"
+            created_date: "{{ ansible_date_time.iso8601 }}"
+            
+    - name: Display setup completion message
+      ansible.builtin.debug:
+        msg: |
+          Workshop environment setup completed successfully!
+          
+          Created resources:
+          - Namespace: {{ workshop_namespace }}
+          - Service Account: {{ service_account_name }}
+          - Environment namespaces: {{ workshop_namespace }}-{dev,test,prod}
+          - Resource quotas and network policies applied
+          
+          Next steps:
+          1. Verify setup with: ./scripts/exercise0/validate_setup.sh
+          2. Proceed to Module 1 exercises

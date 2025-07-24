@@ -1,0 +1,59 @@
+---
+# Tasks for RBAC validation
+
+- name: "Verify service accounts were created"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ServiceAccount
+    name: "{{ item.name }}"
+    namespace: "{{ ims_rbac_namespace }}"
+  loop: "{{ ims_rbac_service_accounts }}"
+  when: item.environments is not defined or ims_rbac_environment in item.environments
+  register: ims_sa_validation
+
+- name: "Verify RoleBindings were created"
+  kubernetes.core.k8s_info:
+    api_version: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    name: "{{ item.name }}-namespace-binding"
+    namespace: "{{ ims_rbac_namespace }}"
+  loop: "{{ ims_rbac_service_accounts }}"
+  when: item.environments is not defined or ims_rbac_environment in item.environments
+  register: ims_rb_validation
+
+- name: "Verify ClusterRoleBindings were created (dev/test only)"
+  kubernetes.core.k8s_info:
+    api_version: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    name: "{{ item.name }}-cluster-{{ ims_rbac_namespace }}"
+  loop: "{{ ims_rbac_service_accounts }}"
+  when: 
+    - item.environments is not defined or ims_rbac_environment in item.environments
+    - ims_rbac_environment in ['dev', 'test']
+    - item.role_type in ['operator', 'admin']
+  register: ims_crb_validation
+
+- name: "Calculate validation results"
+  ansible.builtin.set_fact:
+    ims_rbac_validation_results:
+      service_accounts_created: "{{ ims_sa_validation.results | selectattr('resources', 'defined') | selectattr('resources') | list | length }}"
+      role_bindings_created: "{{ ims_rb_validation.results | selectattr('resources', 'defined') | selectattr('resources') | list | length }}"
+      cluster_role_bindings_created: "{{ ims_crb_validation.results | selectattr('resources', 'defined') | selectattr('resources') | list | length if ims_crb_validation.results is defined else 0 }}"
+      expected_service_accounts: "{{ ims_rbac_service_accounts | selectattr('environments', 'undefined') | list | length + ims_rbac_service_accounts | selectattr('environments', 'defined') | selectattr('environments', 'contains', ims_rbac_environment) | list | length }}"
+
+- name: "Display RBAC validation summary"
+  ansible.builtin.debug:
+    msg: |
+      === IMS RBAC Validation Results ===
+      Environment: {{ ims_rbac_environment }}
+      Namespace: {{ ims_rbac_namespace }}
+      
+      Service Accounts: {{ ims_rbac_validation_results.service_accounts_created }}/{{ ims_rbac_validation_results.expected_service_accounts }} created
+      RoleBindings: {{ ims_rbac_validation_results.role_bindings_created }} created
+      ClusterRoleBindings: {{ ims_rbac_validation_results.cluster_role_bindings_created }} created
+      
+      RBAC Configuration: {{ 'Complete' if ims_rbac_validation_results.service_accounts_created == ims_rbac_validation_results.expected_service_accounts else 'Incomplete' }}
+
+- name: "Set RBAC completion status"
+  ansible.builtin.set_fact:
+    ims_rbac_complete: "{{ ims_rbac_validation_results.service_accounts_created == ims_rbac_validation_results.expected_service_accounts }}"

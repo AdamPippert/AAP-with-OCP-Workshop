@@ -1,0 +1,60 @@
+# Exercise 1.3: Event-Driven Inventory Updates Configuration
+# This file configures webhook-based inventory synchronization
+
+# Standard multi-cluster inventory configuration
+plugin: kubernetes.core.k8s
+
+connections:
+  - kubeconfig: ~/.kube/config
+    context: cluster-dev
+  - kubeconfig: ~/.kube/config
+    context: cluster-test
+  - kubeconfig: ~/.kube/config
+    context: cluster-prod
+
+compose:
+  ansible_host: status.podIP | default('unknown')
+  cluster_name: connection.context
+  unique_id: metadata.name + "-" + metadata.namespace + "-" + connection.context
+  pod_phase: status.phase | default('Unknown')
+  node_name: spec.nodeName | default('unscheduled')
+  
+  # Add timestamp tracking for change detection
+  creation_timestamp: metadata.creationTimestamp
+  resource_version: metadata.resourceVersion
+  
+  # Add webhook-relevant metadata
+  webhook_enabled: metadata.annotations['inventory.webhook/enabled'] | default('false')
+  last_updated: metadata.annotations['inventory.webhook/last_updated'] | default('')
+
+keyed_groups:
+  - key: connection.context
+    prefix: cluster
+    separator: "_"
+  - key: metadata.namespace
+    prefix: namespace
+    separator: "_"
+  - key: metadata.labels['app']
+    prefix: app
+    separator: "_"
+  - key: metadata.namespace + "_" + connection.context
+    prefix: ns_cluster
+    separator: "_"
+    
+  # Webhook-specific grouping
+  - key: metadata.annotations['inventory.webhook/enabled']
+    prefix: webhook_enabled
+    separator: "_"
+
+filters:
+  - status.phase == "Running"
+  - metadata.namespace not in ["kube-system", "kube-public", "kube-node-lease"]
+  - not (metadata.namespace.startswith("openshift-") and metadata.namespace != "openshift-ingress")
+
+# Optimized caching for webhook scenarios
+cache: true
+cache_plugin: memory
+cache_timeout: 60  # Shorter cache for webhook updates
+
+# Enable strict mode for webhook validation  
+strict: true

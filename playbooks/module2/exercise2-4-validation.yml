@@ -1,0 +1,291 @@
+---
+# Module 2, Exercise 4: Module Validation and Peer Review
+# Learning Focus: Comprehensive validation and peer review process
+# Time: 5 minutes peer review
+
+- name: "Exercise 2.4: Module 2 Validation and Peer Review"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    # Validation requirements for Module 2
+    validation_checks:
+      - name: "namespace_exists"
+        description: "Workshop namespace exists with proper labels"
+        critical: true
+      - name: "service_account_created"
+        description: "Service accounts created with proper RBAC"
+        critical: true
+      - name: "deployment_ready"
+        description: "IMS connector deployment is ready and healthy"
+        critical: true
+      - name: "rbac_configured"
+        description: "RBAC roles and bindings properly configured"
+        critical: true
+      - name: "rollback_capability"
+        description: "Rollback capability demonstrated"
+        critical: false
+      - name: "idempotency_verified"
+        description: "Deployment idempotency verified"
+        critical: true
+
+    # Expected learning outcomes
+    learning_outcomes:
+      - "Idempotent deployment patterns using redhat.openshift collection"
+      - "Automated service account provisioning with RBAC binding"
+      - "Rollback capabilities using block-rescue-always patterns"
+      - "Security context constraints for IMS workloads"
+      - "Production-ready resource management practices"
+
+  tasks:
+    - name: "Validate Module 2 prerequisites are met"
+      ansible.builtin.assert:
+        that:
+          - module2_namespace is defined
+          - module2_app_name is defined
+        fail_msg: "Module 2 exercises must be completed first"
+        quiet: true
+
+    - name: "Check namespace exists and has proper labels"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Namespace
+        name: "{{ module2_namespace }}"
+      register: namespace_validation
+      failed_when: namespace_validation.resources | length == 0
+
+    - name: "Validate namespace labels and annotations"
+      ansible.builtin.set_fact:
+        namespace_labels_valid: "{{ 
+          namespace_validation.resources[0].metadata.labels['workshop.redhat.com/module'] == 'module2' and
+          namespace_validation.resources[0].metadata.labels['app.kubernetes.io/managed-by'] == 'ansible'
+        }}"
+
+    - name: "Check IMS connector deployment status"
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ module2_app_name }}"
+        namespace: "{{ module2_namespace }}"
+      register: deployment_validation
+
+    - name: "Validate deployment health and configuration"
+      ansible.builtin.set_fact:
+        deployment_healthy: "{{ 
+          deployment_validation.resources | length > 0 and
+          deployment_validation.resources[0].status.readyReplicas | default(0) == deployment_validation.resources[0].status.replicas | default(0) and
+          deployment_validation.resources[0].status.replicas | default(0) > 0
+        }}"
+        deployment_has_proper_labels: "{{
+          deployment_validation.resources | length > 0 and
+          deployment_validation.resources[0].metadata.labels['app.kubernetes.io/managed-by'] == 'ansible'
+        }}"
+
+    - name: "Check service account and RBAC configuration"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: ServiceAccount
+        namespace: "{{ module2_namespace }}"
+      register: service_accounts_check
+
+    - name: "Validate RBAC bindings exist"
+      kubernetes.core.k8s_info:
+        api_version: rbac.authorization.k8s.io/v1
+        kind: RoleBinding
+        namespace: "{{ module2_namespace }}"
+      register: role_bindings_check
+
+    - name: "Check for custom roles and permissions"
+      kubernetes.core.k8s_info:
+        api_version: rbac.authorization.k8s.io/v1
+        kind: Role
+        name: "ims-namespace-operations"
+        namespace: "{{ module2_namespace }}"
+      register: custom_role_check
+
+    - name: "Validate ConfigMap and Secret management"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: ConfigMap
+        name: "{{ module2_app_name }}-config"
+        namespace: "{{ module2_namespace }}"
+      register: configmap_check
+
+    - name: "Check Secret configuration"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Secret
+        name: "{{ module2_app_name }}-secret"
+        namespace: "{{ module2_namespace }}"
+      register: secret_check
+
+    - name: "Validate Service configuration"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Service
+        name: "{{ module2_app_name }}-service"
+        namespace: "{{ module2_namespace }}"
+      register: service_check
+
+    - name: "Test idempotency by re-running deployment creation"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ deployment_validation.resources[0] }}"
+      register: idempotency_test
+      when: deployment_validation.resources | length > 0
+
+    - name: "Verify idempotency (no changes should be made)"
+      ansible.builtin.set_fact:
+        idempotency_verified: "{{ not idempotency_test.changed }}"
+      when: idempotency_test is defined
+
+    - name: "Check for rollback annotations (indicates rollback was tested)"
+      ansible.builtin.set_fact:
+        rollback_tested: "{{ 
+          deployment_validation.resources | length > 0 and
+          'deployment.workshop.redhat.com/last-operation' in deployment_validation.resources[0].metadata.annotations | default({})
+        }}"
+
+    - name: "Compile validation results"
+      ansible.builtin.set_fact:
+        validation_results:
+          namespace_exists:
+            status: "{{ namespace_validation.resources | length > 0 }}"
+            details: "Namespace {{ module2_namespace }} {{ 'exists' if namespace_validation.resources | length > 0 else 'not found' }}"
+            labels_valid: "{{ namespace_labels_valid | default(false) }}"
+          service_account_created:
+            status: "{{ service_accounts_check.resources | length >= 1 }}"
+            details: "{{ service_accounts_check.resources | length }} service accounts found"
+            count: "{{ service_accounts_check.resources | length }}"
+          deployment_ready:
+            status: "{{ deployment_healthy | default(false) }}"
+            details: "Deployment {{ 'is healthy' if deployment_healthy | default(false) else 'has issues' }}"
+            ready_replicas: "{{ deployment_validation.resources[0].status.readyReplicas | default(0) if deployment_validation.resources | length > 0 else 0 }}"
+            total_replicas: "{{ deployment_validation.resources[0].status.replicas | default(0) if deployment_validation.resources | length > 0 else 0 }}"
+          rbac_configured:
+            status: "{{ custom_role_check.resources | length > 0 and role_bindings_check.resources | length > 0 }}"
+            details: "Custom role and bindings {{ 'configured' if custom_role_check.resources | length > 0 and role_bindings_check.resources | length > 0 else 'missing' }}"
+            role_bindings_count: "{{ role_bindings_check.resources | length }}"
+          rollback_capability:
+            status: "{{ rollback_tested | default(false) }}"
+            details: "Rollback capability {{ 'demonstrated' if rollback_tested | default(false) else 'not tested' }}"
+          idempotency_verified:
+            status: "{{ idempotency_verified | default(false) }}"
+            details: "Idempotency {{ 'verified' if idempotency_verified | default(false) else 'not confirmed' }}"
+          supporting_resources:
+            configmap_exists: "{{ configmap_check.resources | length > 0 }}"
+            secret_exists: "{{ secret_check.resources | length > 0 }}"
+            service_exists: "{{ service_check.resources | length > 0 }}"
+
+    - name: "Calculate overall validation score"
+      ansible.builtin.set_fact:
+        critical_checks_passed: "{{ 
+          (validation_results.namespace_exists.status and validation_results.namespace_exists.labels_valid) and
+          validation_results.service_account_created.status and
+          validation_results.deployment_ready.status and
+          validation_results.rbac_configured.status and
+          validation_results.idempotency_verified.status
+        }}"
+        optional_checks_passed: "{{ validation_results.rollback_capability.status }}"
+        supporting_resources_ready: "{{
+          validation_results.supporting_resources.configmap_exists and
+          validation_results.supporting_resources.secret_exists and
+          validation_results.supporting_resources.service_exists
+        }}"
+
+    - name: "Display comprehensive validation report"
+      ansible.builtin.debug:
+        msg: |
+          ╔══════════════════════════════════════════════════════════════╗
+          ║                    Module 2 Validation Report                ║
+          ╚══════════════════════════════════════════════════════════════╝
+          
+          Environment: {{ module2_environment | default('Unknown') }}
+          Namespace: {{ module2_namespace }}
+          Application: {{ module2_app_name }}
+          
+          ┌─ Critical Validation Checks ─────────────────────────────────┐
+          │ ✓ Namespace Setup:        {{ '✓ PASS' if validation_results.namespace_exists.status and validation_results.namespace_exists.labels_valid else '✗ FAIL' }}                             │
+          │   └─ Labels Valid:        {{ '✓' if validation_results.namespace_exists.labels_valid else '✗' }}                             │
+          │ ✓ Service Accounts:       {{ '✓ PASS' if validation_results.service_account_created.status else '✗ FAIL' }} ({{ validation_results.service_account_created.count }} created)      │
+          │ ✓ Deployment Health:      {{ '✓ PASS' if validation_results.deployment_ready.status else '✗ FAIL' }}                             │
+          │   └─ Ready Replicas:      {{ validation_results.deployment_ready.ready_replicas }}/{{ validation_results.deployment_ready.total_replicas }}                          │
+          │ ✓ RBAC Configuration:     {{ '✓ PASS' if validation_results.rbac_configured.status else '✗ FAIL' }}                             │
+          │   └─ Role Bindings:       {{ validation_results.rbac_configured.role_bindings_count }} configured                     │
+          │ ✓ Idempotency:           {{ '✓ PASS' if validation_results.idempotency_verified.status else '✗ FAIL' }}                             │
+          └───────────────────────────────────────────────────────────────┘
+          
+          ┌─ Optional Learning Checks ───────────────────────────────────┐
+          │ ○ Rollback Capability:    {{ '✓ DEMONSTRATED' if validation_results.rollback_capability.status else '- NOT TESTED' }}                    │
+          └───────────────────────────────────────────────────────────────┘
+          
+          ┌─ Supporting Resources ────────────────────────────────────────┐
+          │ • ConfigMap:              {{ '✓' if validation_results.supporting_resources.configmap_exists else '✗' }} Present                           │
+          │ • Secret:                 {{ '✓' if validation_results.supporting_resources.secret_exists else '✗' }} Present                           │
+          │ • Service:                {{ '✓' if validation_results.supporting_resources.service_exists else '✗' }} Present                           │
+          └───────────────────────────────────────────────────────────────┘
+          
+          ┌─ Learning Outcomes Assessment ───────────────────────────────┐
+          {% for outcome in learning_outcomes %}
+          │ • {{ outcome[:55] }}{{ '...' if outcome|length > 55 else '' }}│
+          {% endfor %}
+          └───────────────────────────────────────────────────────────────┘
+          
+          Overall Status: {{ '🎉 MODULE 2 COMPLETE' if critical_checks_passed and supporting_resources_ready else '⚠️  ISSUES FOUND - REVIEW REQUIRED' }}
+          Critical Checks: {{ '✓ ALL PASSED' if critical_checks_passed else '✗ SOME FAILED' }}
+          Supporting Resources: {{ '✓ ALL READY' if supporting_resources_ready else '✗ INCOMPLETE' }}
+
+    - name: "Provide next steps guidance"
+      ansible.builtin.debug:
+        msg: |
+          ┌─ Next Steps ──────────────────────────────────────────────────┐
+          {% if critical_checks_passed and supporting_resources_ready %}
+          │ ✓ Module 2 requirements met - ready for Module 3             │
+          │ • Review peer feedback and discuss implementation details     │
+          │ • Consider additional RBAC scenarios for your environment    │
+          │ • Practice rollback procedures in different failure modes    │
+          {% else %}
+          │ ⚠️  Complete the following before proceeding:                  │
+          {% if not validation_results.namespace_exists.status %}
+          │   - Run Exercise 2-1 to create the namespace and deployment  │
+          {% endif %}
+          {% if not validation_results.rbac_configured.status %}
+          │   - Run Exercise 2-2 to configure RBAC properly             │
+          {% endif %}
+          {% if not validation_results.deployment_ready.status %}
+          │   - Troubleshoot deployment issues in {{ module2_namespace }}        │
+          {% endif %}
+          {% if not validation_results.idempotency_verified.status %}
+          │   - Verify idempotent behavior by re-running playbooks      │
+          {% endif %}
+          {% endif %}
+          │                                                               │
+          │ 📖 Documentation: Check workshop materials for troubleshooting│
+          │ 👥 Peer Review: Discuss implementation with workshop partners │
+          └───────────────────────────────────────────────────────────────┘
+
+    - name: "Export comprehensive validation data"
+      ansible.builtin.set_stats:
+        data:
+          module2_validation_complete: true
+          module2_critical_checks_passed: "{{ critical_checks_passed }}"
+          module2_supporting_resources_ready: "{{ supporting_resources_ready }}"
+          module2_overall_success: "{{ critical_checks_passed and supporting_resources_ready }}"
+          module2_validation_results: "{{ validation_results }}"
+          module2_ready_for_module3: "{{ critical_checks_passed and supporting_resources_ready }}"
+          module2_validation_timestamp: "{{ ansible_date_time.iso8601 }}"
+
+    - name: "Record validation completion"
+      kubernetes.core.k8s:
+        state: present
+        merge_type: merge
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{ module2_namespace }}"
+            annotations:
+              workshop.redhat.com/module2-validation: "{{ 'passed' if critical_checks_passed and supporting_resources_ready else 'failed' }}"
+              workshop.redhat.com/validation-timestamp: "{{ ansible_date_time.iso8601 }}"
+              workshop.redhat.com/validation-score: "{{ ((validation_results.values() | selectattr('status', 'defined') | selectattr('status') | list | length) / (validation_results.values() | selectattr('status', 'defined') | list | length) * 100) | round(1) }}%"
+      ignore_errors: true
