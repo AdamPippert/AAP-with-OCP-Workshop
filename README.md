@@ -24,6 +24,27 @@ This repository contains a comprehensive workshop delivery system for the Advanc
 - 📊 **Multi-user management** supporting 50+ participants
 - 🚀 **One-command deployment** for complete workshop setup
 
+## ⚡ Quick Start (Experienced Users)
+
+For experienced users familiar with RHDP and OpenShift:
+
+```bash
+# 1. Setup
+git clone <repo-url> && cd AAP-with-OCP-Workshop
+
+# 2. Add RHDP exports (workshop_details.txt, workshop_details2.txt, etc.)
+
+# 3. Deploy everything
+./scripts/setup_multi_user.sh --vscode --generate-emails -p 10
+
+# 4. Send emails from workshop_emails/ directory
+
+# 5. Monitor during workshop
+./scripts/manage_vscode.sh status
+```
+
+**Need details?** Continue to the full setup guide below.
+
 ## 🚀 Quick Start for Workshop Delivery
 
 ### Prerequisites
@@ -40,23 +61,120 @@ git clone <repository-url>
 cd AAP-with-OCP-Workshop
 ```
 
-#### Step 2: Obtain Workshop Details
-1. Request AAP Product Demo environments from RHDP (Red Hat Demo Platform)
-2. For workshops with 30+ users, request multiple environments:
-   - `workshop_details.txt` (users 1-30)
-   - `workshop_details2.txt` (users 31-60)
-   - Add more files as needed for larger workshops
+#### Step 2: Obtain Workshop Details from RHDP
 
-3. Download the "bulk export" data from RHDP and save as `workshop_details.txt` in the repository root
+##### Request Demo Environments
+1. **Access RHDP**: Log into [Red Hat Demo Platform](https://demo.redhat.com)
+2. **Request AAP Demo**: Search for "Ansible Automation Platform Product Demo"
+3. **Calculate Environments**: RHDP limits to 30 users per environment
+   - **1-30 users**: Request 1 environment
+   - **31-60 users**: Request 2 environments  
+   - **61-90 users**: Request 3 environments
+   - Continue pattern for larger workshops
+
+##### Export User Data from RHDP
+
+**For Each Environment:**
+
+1. **Navigate to Service**: Go to your provisioned AAP demo service
+2. **Access Users Tab**: Click on the "Users" section
+3. **Export User Data**: 
+   - Click "Export" or "Download" button
+   - Select "Bulk Export" or "All Users" format
+   - Choose "Text" or "Raw Data" format (not CSV)
+
+**Expected Export Format:**
+```
+Service	Assigned Email	Details
+
+enterprise.aap-product-demos-cnv-aap25.prod-xxxxx
+
+user1@company.com
+
+Messages
+
+    Your AWS credentials are:
+    AWS_ACCESS_KEY_ID: AKIAXXXXXXXX
+    AWS_SECRET_ACCESS_KEY: xxxxxxxx
+    
+    OpenShift Console: https://console-openshift-console.apps.cluster-xxxxx.dynamic.redhatworkshops.io
+    OpenShift API: https://api.cluster-xxxxx.dynamic.redhatworkshops.io:6443
+    Automation Controller URL: https://aap-aap.apps.cluster-xxxxx.dynamic.redhatworkshops.io
+    Automation Controller Admin Login: admin
+    Automation Controller Admin Password: xxxxxxxx
+    
+    SSH Access:
+    ssh lab-user@ssh.ocpvXX.rhdp.net -p XXXXX
+    Password: xxxxxxxx
+
+enterprise.aap-product-demos-cnv-aap25.prod-yyyyy
+
+user2@company.com
+
+[next user details...]
+```
+
+##### Save Workshop Details Files
+
+**File Naming Convention:**
+- **Environment 1**: Save as `workshop_details.txt` (users 1-30)
+- **Environment 2**: Save as `workshop_details2.txt` (users 31-60)
+- **Environment 3**: Save as `workshop_details3.txt` (users 61-90)
+- Continue pattern: `workshop_detailsN.txt`
+
+**File Validation:**
+```bash
+# Quick validation - each file should contain these patterns:
+grep -c "enterprise.aap-product-demos" workshop_details.txt
+# Expected: 30 (for environment with 30 users)
+
+grep -c "@" workshop_details.txt  
+# Expected: 30 (email addresses)
+
+grep -c "OpenShift Console:" workshop_details.txt
+# Expected: 30 (OpenShift URLs)
+
+# Check file structure
+head -20 workshop_details.txt
+# Should show: Service, Email, Messages pattern
+```
+
+**Important Notes:**
+- Files must be in repository root directory
+- Keep exact format from RHDP export
+- Do not modify the exported content
+- Files contain sensitive credentials (automatically gitignored)
+- Each user block should have Service → Email → Messages sections
 
 #### Step 3: Parse Workshop Details
+
+The system automatically discovers and processes all `workshop_detailsX.txt` files:
+
 ```bash
-# Parse workshop details for all users
+# Auto-discover and parse all workshop_details*.txt files
 ./scripts/parse_workshop_details.sh -v
 
-# Review parsed users
+# Or parse specific files manually
+./scripts/parse_workshop_details.sh --files workshop_details.txt,workshop_details2.txt
+
+# Preview parsing without creating files
+./scripts/parse_workshop_details.sh --dry-run -v
+```
+
+**Parsing Process:**
+- **Auto-discovery**: Finds all `workshop_details*.txt` files
+- **Continuous numbering**: Users numbered 1-47 across all files
+- **Environment extraction**: Parses AWS, OpenShift, AAP, and SSH credentials
+- **Validation**: Checks for required fields and formats
+
+**Generated Output:**
+```bash
+# Review parsed users and assignments
 cat user_environments/users.csv
 cat user_environments/summary.txt
+
+# Check individual user environments
+ls user_environments/.env*
 ```
 
 #### Step 4: Deploy Complete Workshop Infrastructure
@@ -355,8 +473,71 @@ A successful workshop deployment includes:
 
 ## 🆘 Support and Troubleshooting
 
+### Workshop Details Issues
+
+#### RHDP Export Problems
+```bash
+# Check file format
+head -20 workshop_details.txt
+
+# Verify file structure
+grep -c "enterprise.aap-product-demos" workshop_details.txt
+
+# Test parsing with dry-run
+./scripts/parse_workshop_details.sh --dry-run -v
+```
+
+**Common RHDP Export Issues:**
+- **Wrong format**: Ensure "Text/Raw Data" export, not CSV
+- **Missing sections**: Each user needs Service, Email, and Messages sections
+- **Encoding issues**: Save files as UTF-8 text
+- **Truncated data**: Verify complete export downloaded
+
+#### File Naming and Discovery
+```bash
+# Check discovered files
+./scripts/parse_workshop_details.sh --dry-run | grep "Discovered files"
+
+# Manual file specification if auto-discovery fails
+./scripts/parse_workshop_details.sh --files workshop_details.txt,workshop_details2.txt
+```
+
+#### Parsing Validation Errors
+```bash
+# Check parsing logs for specific errors
+./scripts/parse_workshop_details.sh -v 2>&1 | grep ERROR
+
+# Validate required fields are present
+grep -A 20 "Messages" workshop_details.txt | grep -E "(AWS_ACCESS_KEY|OpenShift Console|Automation Controller)"
+```
+
+### Multi-User Setup Issues
+
+#### Environment Count Mismatches
+```bash
+# Check how many users were parsed
+wc -l user_environments/users.csv
+
+# Verify user number sequence
+ls user_environments/.env* | wc -l
+
+# Check for gaps in user numbering
+ls user_environments/ | grep -E "\.env[0-9]+" | sort -V
+```
+
+#### Individual User Environment Problems
+```bash
+# Check specific user environment
+cat user_environments/.env05
+
+# Validate user credentials
+source user_environments/.env05
+curl -k "$AAP_URL/api/v2/ping/"
+```
+
 ### Common Issues
-- **Environment parsing failures**: Check RHDP export format
+- **Environment parsing failures**: Check RHDP export format using steps above
+- **File discovery issues**: Use manual file specification with --files option
 - **VSCode deployment issues**: Verify OpenShift permissions and resources
 - **Email generation problems**: Ensure all environments are set up correctly
 - **Access credential issues**: Validate AAP Controller and OpenShift connectivity
@@ -367,12 +548,81 @@ A successful workshop deployment includes:
 3. **Review documentation**: See `docs/multi-user-setup.md` for detailed guidance
 4. **Test with single user**: Use `-u 1` flags to test individual setups
 
+## 📋 Complete Workshop Setup Example
+
+Here's a real example for a 45-user workshop:
+
+### Step-by-Step Walkthrough
+
+```bash
+# 1. Clone repository
+git clone https://github.com/your-org/AAP-with-OCP-Workshop.git
+cd AAP-with-OCP-Workshop
+
+# 2. Add RHDP export files (45 users = 2 environments)
+# - workshop_details.txt (users 1-30 from environment 1)
+# - workshop_details2.txt (users 31-45 from environment 2)
+# Files should be in repository root
+
+# 3. Verify files are discovered
+./scripts/parse_workshop_details.sh --dry-run
+# Expected output: "Discovered files: workshop_details.txt, workshop_details2.txt"
+
+# 4. Parse all workshop details
+./scripts/parse_workshop_details.sh -v
+# Creates user_environments/.env01 through .env45
+
+# 5. Review parsed users
+cat user_environments/users.csv
+cat user_environments/summary.txt
+
+# 6. Deploy complete workshop infrastructure
+./scripts/setup_multi_user.sh --vscode --generate-emails -p 10 -v
+
+# 7. Validate all environments
+./scripts/validate_multi_user.sh --full
+
+# 8. Review generated emails
+ls workshop_emails/
+cat workshop_emails/DELIVERY_INSTRUCTIONS.md
+
+# 9. Send emails using preferred method (see Email Delivery Options)
+
+# 10. Monitor during workshop
+./scripts/manage_vscode.sh status
+./scripts/validate_multi_user.sh --quick
+```
+
+### Expected File Structure After Setup
+```
+AAP-with-OCP-Workshop/
+├── workshop_details.txt          # RHDP export 1 (users 1-30)
+├── workshop_details2.txt         # RHDP export 2 (users 31-45)
+├── user_environments/            # Generated user configs
+│   ├── .env01, .env02, ..., .env45
+│   ├── users.csv                 # User assignments
+│   ├── summary.txt               # Parse summary
+│   └── logs/                     # Setup logs
+└── workshop_emails/              # Generated email content
+    ├── DELIVERY_INSTRUCTIONS.md  # Email delivery guide
+    ├── workshop_emails.csv       # Mail merge data
+    └── html/                     # Individual HTML emails
+```
+
+### Workshop Success Checklist
+- [ ] All 45 `.env` files created in `user_environments/`
+- [ ] VSCode instances deployed: `./scripts/manage_vscode.sh status`
+- [ ] Email files generated: `ls workshop_emails/html/`
+- [ ] All environments validated: `./scripts/validate_multi_user.sh --full`
+- [ ] Participant emails sent using chosen delivery method
+- [ ] Test access with sample user (user01) credentials
+
 ## 🚀 Ready to Run Your Workshop?
 
 1. **Clone the repository**
-2. **Add your `workshop_details.txt` file**
+2. **Add your `workshop_detailsX.txt` files from RHDP exports**
 3. **Run**: `./scripts/setup_multi_user.sh --vscode --generate-emails`
-4. **Send emails to participants**
+4. **Send emails to participants using generated files**
 5. **Start teaching!**
 
 ---
