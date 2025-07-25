@@ -353,6 +353,14 @@ generate_html_email() {
                 <td><a href="${OCP_CONSOLE_URL}" class="url">${OCP_CONSOLE_URL}</a></td>
             </tr>
             <tr>
+                <td>👤 Admin Username:</td>
+                <td><span class="code">kubeadmin</span></td>
+            </tr>
+            <tr>
+                <td>🔐 Admin Password:</td>
+                <td><span class="code">KUBEADMIN-PASSWORD-NEEDED</span></td>
+            </tr>
+            <tr>
                 <td>🔧 API Server:</td>
                 <td><span class="code">${OCP_API_URL}</span></td>
             </tr>
@@ -607,6 +615,8 @@ Password: ${AAP_PASSWORD}
 
 ☸️ OPENSHIFT CONSOLE:
 URL: ${OCP_CONSOLE_URL}
+Admin Username: kubeadmin
+Admin Password: KUBEADMIN-PASSWORD-NEEDED
 API: ${OCP_API_URL}
 
 📚 WORKSHOP MATERIALS:
@@ -675,6 +685,8 @@ Username: ${AAP_USERNAME}
 Password: ${AAP_PASSWORD}
 
 OpenShift Console: ${OCP_CONSOLE_URL}
+Kubeadmin Username: kubeadmin
+Kubeadmin Password: KUBEADMIN-PASSWORD-NEEDED
 
 Workshop Materials: ${EXERCISES_URL}
 
