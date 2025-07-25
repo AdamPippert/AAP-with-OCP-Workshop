@@ -8,7 +8,6 @@ set -euo pipefail
 # Default configuration
 DEFAULT_NAMESPACE="workshop-vscode"
 DEFAULT_ENV_DIR="user_environments"
-DEFAULT_PARALLEL=5
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFESTS_DIR="${SCRIPT_DIR}/../manifests/vscode-server"
 
@@ -30,7 +29,6 @@ USAGE:
 OPTIONS:
     -d, --directory DIR     User environments directory (default: user_environments)
     -u, --users RANGE       User range (e.g., 1-5, 3,7,9, or single number)
-    -p, --parallel NUM      Max parallel deployments (default: 5)
     -n, --namespace NAME    VSCode namespace (default: workshop-vscode)
     --deploy                Deploy VSCode instances (default action)
     --undeploy              Remove VSCode instances
@@ -39,11 +37,16 @@ OPTIONS:
     -v, --verbose           Detailed output
     -h, --help              Show this help
 
+MULTI-CLUSTER DEPLOYMENT:
+    This script automatically logs into each user's individual OpenShift cluster
+    based on credentials in their .env files. Bearer tokens are automatically
+    updated from workshop_details*.txt files before deployment.
+
 EXAMPLES:
-    $0                          # Deploy VSCode for all users
-    $0 -u 1-10                  # Deploy for users 1-10
-    $0 --undeploy -u 5          # Remove VSCode for user 5
-    $0 --status                 # Check all deployments
+    $0                          # Deploy VSCode for all users (multi-cluster)
+    $0 -u 1-10                  # Deploy for users 1-10 across their clusters
+    $0 --undeploy -u 5          # Remove VSCode for user 5 from their cluster
+    $0 --status                 # Check all deployments across clusters
     $0 --dry-run -v             # Preview deployment
 
 USER RANGE FORMATS:
@@ -110,21 +113,65 @@ parse_user_range() {
     printf '%s\n' "${users[@]}" | sort -n | uniq
 }
 
-# Check if OpenShift CLI is available and user is logged in
-check_oc_login() {
+# Check if OpenShift CLI is available
+check_oc_command() {
     if ! command -v oc &> /dev/null; then
         log_error "OpenShift CLI 'oc' not found. Please install it."
         return 1
     fi
+}
+
+# Login to a specific user's cluster
+login_to_user_cluster() {
+    local user_num="$1"
+    local env_dir="$2"
+    local user_env_file="${env_dir}/.env$(printf "%02d" "$user_num")"
     
-    if ! oc whoami &> /dev/null; then
-        log_error "Not logged into OpenShift. Please run 'oc login'."
+    if [[ ! -f "$user_env_file" ]]; then
+        log_error "User environment file not found: $user_env_file"
         return 1
     fi
     
-    local current_user
-    current_user=$(oc whoami)
-    log_info "Logged in as: $current_user"
+    # Source the user environment to get cluster credentials
+    set -a  # automatically export all variables
+    # shellcheck disable=SC1090
+    source "$user_env_file"
+    set +a
+    
+    if [[ -z "$OCP_API_URL" ]]; then
+        log_error "OCP_API_URL not found in $user_env_file"
+        return 1
+    fi
+    
+    log_info "Logging into cluster for User $(printf "%02d" "$user_num"): $OCP_API_URL"
+    
+    # Try to use bearer token if available
+    if [[ -n "$OCP_BEARER_TOKEN" ]]; then
+        if oc login --token="$OCP_BEARER_TOKEN" --server="$OCP_API_URL" --insecure-skip-tls-verify=true &>/dev/null; then
+            log_info "Logged in using bearer token"
+            return 0
+        fi
+    fi
+    
+    # If no bearer token, try with kubeadmin password if available
+    if [[ -n "$OCP_KUBEADMIN_PASSWORD" ]]; then
+        if oc login -u kubeadmin -p "$OCP_KUBEADMIN_PASSWORD" --server="$OCP_API_URL" --insecure-skip-tls-verify=true &>/dev/null; then
+            log_info "Logged in using kubeadmin credentials"
+            return 0
+        fi
+    fi
+    
+    # Fallback: prompt for credentials
+    log_warn "No bearer token or kubeadmin password available for User $(printf "%02d" "$user_num")"
+    log_warn "Attempting login with server only (may prompt for credentials)"
+    
+    if oc login --server="$OCP_API_URL" --insecure-skip-tls-verify=true; then
+        log_info "Logged in to User $(printf "%02d" "$user_num") cluster"
+        return 0
+    else
+        log_error "Failed to login to User $(printf "%02d" "$user_num") cluster"
+        return 1
+    fi
 }
 
 # Load user environment configuration
@@ -174,7 +221,7 @@ deploy_namespace() {
     log_success "Namespace and common resources deployed"
 }
 
-# Deploy VSCode instance for a single user
+# Deploy VSCode instance for a single user in their specific cluster
 deploy_user_vscode() {
     local user_num="$1"
     local env_dir="$2"
@@ -185,27 +232,111 @@ deploy_user_vscode() {
     local user_num_padded
     user_num_padded=$(printf "%02d" "$user_num")
     
-    log_info "Deploying VSCode for user $user_num_padded..."
+    log_info "=== Deploying VSCode for User $user_num_padded ==="
+    
+    # Login to user's specific cluster first
+    if ! login_to_user_cluster "$user_num" "$env_dir"; then
+        log_error "Failed to login to User $user_num_padded cluster"
+        return 1
+    fi
     
     # Load user environment
     if ! load_user_env "$user_num" "$env_dir"; then
         return 1
     fi
     
-    # Set template parameters
+    if [[ "$dry_run" == "true" ]]; then
+        log_info "DRY RUN: Would deploy VSCode for user $user_num_padded in their individual cluster"
+        log_info "Cluster: $OCP_API_URL"
+        log_info "User Email: $USER_EMAIL"
+        return 0
+    fi
+    
+    # Create namespace and basic resources in this user's cluster
+    log_info "Creating namespace and resources in user's cluster..."
+    
+    # Create namespace
+    oc create namespace "$namespace" --dry-run=client -o yaml | oc apply -f -
+    
+    # Create service account with required permissions
+    cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vscode-workshop
+  namespace: $namespace
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vscode-workshop-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: vscode-workshop
+  namespace: $namespace
+EOF
+    
+    # Generate VSCode URL and password if not present
+    if [[ -z "${VSCODE_URL:-}" ]]; then
+        if [[ -n "$OCP_CLUSTER_DOMAIN" ]]; then
+            VSCODE_URL="https://vscode-user${user_num_padded}.${OCP_CLUSTER_DOMAIN}"
+        else
+            log_error "Cannot determine VSCode URL for user $user_num_padded - missing OCP_CLUSTER_DOMAIN"
+            return 1
+        fi
+        
+        # Add VSCode URL to the .env file for future use
+        echo "VSCODE_URL=${VSCODE_URL}" >> "${env_dir}/.env${user_num_padded}"
+        
+        # Generate VSCode password if not present
+        if [[ -z "${VSCODE_PASSWORD:-}" ]]; then
+            VSCODE_PASSWORD="workshop-user${user_num_padded}"
+            echo "VSCODE_PASSWORD=${VSCODE_PASSWORD}" >> "${env_dir}/.env${user_num_padded}"
+        fi
+        
+        log_info "Generated VSCode URL: $VSCODE_URL"
+    fi
+    
+    # Get available storage class
+    local storage_classes=($(oc get sc -o name 2>/dev/null | sed 's/storageclass.storage.k8s.io\///' || echo ""))
+    local preferred=("gp3-csi" "gp2" "standard" "default")
+    local storage_class="standard"  # fallback
+    
+    for pref in "${preferred[@]}"; do
+        for sc in "${storage_classes[@]}"; do
+            if [[ "$sc" == "$pref" ]]; then
+                storage_class="$sc"
+                break 2
+            fi
+        done
+    done
+    
+    if [[ ${#storage_classes[@]} -gt 0 && "$storage_class" == "standard" ]]; then
+        storage_class="${storage_classes[0]}"
+    fi
+    
+    local cluster_domain=$(echo "$VSCODE_URL" | sed 's|https://vscode-user[0-9]*\.||')
+    local user_id="user${user_num_padded}"
+    
+    log_info "Using storage class: $storage_class"
+    
+    # Deploy VSCode resources for this user
+    # (This would use the same YAML from the emergency script but templated)
+    # For now, use the original template approach but ensure we have the namespace
     local template_params=(
         "USER_NUMBER=$user_num_padded"
         "USER_EMAIL=$USER_EMAIL"
         "WORKSHOP_GUID=$WORKSHOP_GUID"
         "OCP_CLUSTER_DOMAIN=$OCP_CLUSTER_DOMAIN"
         "AAP_URL=$AAP_URL"
+        "VSCODE_URL=${VSCODE_URL}"
+        "VSCODE_PASSWORD=${VSCODE_PASSWORD:-workshop-user${user_num_padded}}"
+        "STORAGE_CLASS=$storage_class"
     )
-    
-    if [[ "$dry_run" == "true" ]]; then
-        log_info "DRY RUN: Would deploy VSCode for user $user_num_padded"
-        log_info "Parameters: ${template_params[*]}"
-        return 0
-    fi
     
     # Process and apply template
     local process_args=()
@@ -219,7 +350,7 @@ deploy_user_vscode() {
         oc process -f "${MANIFESTS_DIR}/deployment-template.yaml" "${process_args[@]}" | oc apply -f - &> /dev/null
     fi
     
-    log_success "VSCode deployed for user $user_num_padded"
+    log_success "VSCode deployed for user $user_num_padded - ${VSCODE_URL}"
     
     # Wait for deployment to be ready (optional)
     if [[ "$verbose" == "true" ]]; then
@@ -324,75 +455,82 @@ discover_users() {
     printf '%s\n' "${users[@]}" | sort -n
 }
 
-# Parallel deployment function
-deploy_users_parallel() {
+# Sequential deployment function for multi-cluster (can't parallelize across different clusters)
+deploy_users_sequential() {
     local users=("$@")
     local env_dir="$2"
     local namespace="$3"
     local verbose="$4"
     local dry_run="$5"
-    local parallel="$6"
     
-    # Remove function parameters from users array
-    users=("${users[@]:6}")
+    # Remove function parameters from users array  
+    users=("${users[@]:5}")
     
-    local pids=()
-    local running=0
     local success=0
     local failed=0
+    local failed_users=()
+    local total_users=${#users[@]}
+    
+    log_info "Deploying VSCode for $total_users users across their individual clusters..."
+    log_warn "Multi-cluster deployment requires sequential processing (cannot parallelize)"
     
     for user in "${users[@]}"; do
-        # Wait if we've reached the parallel limit
-        while [[ $running -ge $parallel ]]; do
-            # Check for completed processes
-            if [[ ${#pids[@]} -gt 0 ]]; then
-                for i in "${!pids[@]}"; do
-                if ! kill -0 "${pids[$i]}" 2>/dev/null; then
-                    wait "${pids[$i]}"
-                    local exit_code=$?
-                    if [[ $exit_code -eq 0 ]]; then
-                        ((success++))
-                    else
-                        ((failed++))
-                    fi
-                    unset 'pids[$i]'
-                    ((running--))
-                fi
-                done
-            fi
-            sleep 1
-        done
+        log_info "Processing User $(printf "%02d" "$user") (${success}/${total_users} completed)"
         
-        # Start new deployment
-        deploy_user_vscode "$user" "$env_dir" "$namespace" "$verbose" "$dry_run" &
-        pids+=($!)
-        ((running++))
+        if deploy_user_vscode "$user" "$env_dir" "$namespace" "$verbose" "$dry_run"; then
+            ((success++))
+        else
+            ((failed++))
+            failed_users+=("$user")
+        fi
+        
+        # Brief pause between deployments to avoid overwhelming clusters
+        sleep 2
     done
     
-    # Wait for all remaining processes
-    if [[ ${#pids[@]} -gt 0 ]]; then
-        for pid in "${pids[@]}"; do
-            if kill -0 "$pid" 2>/dev/null; then
-                wait "$pid"
-                local exit_code=$?
-                if [[ $exit_code -eq 0 ]]; then
-                    ((success++))
-                else
-                    ((failed++))
-                fi
-            fi
+    log_info "Multi-cluster deployment complete: $success/$total_users successful"
+    
+    if [[ ${#failed_users[@]} -gt 0 ]]; then
+        log_warn "Failed users: ${failed_users[*]}"
+        log_info "You can retry failed users individually with:"
+        for failed_user in "${failed_users[@]}"; do
+            echo "  $0 --users $failed_user"
         done
     fi
     
-    log_info "Deployment complete: $success successful, $failed failed"
     return $failed
+}
+
+# Update bearer tokens from workshop_details files  
+update_bearer_tokens() {
+    local env_dir="$1"
+    local verbose="$2"
+    
+    local update_script="${SCRIPT_DIR}/update_bearer_tokens.sh"
+    
+    if [[ -f "$update_script" ]]; then
+        log_info "Updating bearer tokens from workshop_details files..."
+        local update_args=("-d" "$env_dir")
+        
+        if [[ "$verbose" == "true" ]]; then
+            update_args+=("--verbose")
+        fi
+        
+        if "$update_script" "${update_args[@]}"; then
+            log_info "Bearer tokens updated successfully"
+        else
+            log_warn "Bearer token update failed, will attempt login with available credentials"
+        fi
+    else
+        log_warn "Bearer token update script not found: $update_script"
+        log_warn "Proceeding with existing credentials in .env files"
+    fi
 }
 
 # Main function
 main() {
     local env_dir="$DEFAULT_ENV_DIR"
     local namespace="$DEFAULT_NAMESPACE"
-    local parallel="$DEFAULT_PARALLEL"
     local users_range=""
     local action="deploy"
     local verbose="false"
@@ -407,10 +545,6 @@ main() {
                 ;;
             -u|--users)
                 users_range="$2"
-                shift 2
-                ;;
-            -p|--parallel)
-                parallel="$2"
                 shift 2
                 ;;
             -n|--namespace)
@@ -455,9 +589,14 @@ main() {
         exit 1
     fi
     
-    # Check OpenShift login
-    if ! check_oc_login; then
+    # Check OpenShift CLI
+    if ! check_oc_command; then
         exit 1
+    fi
+    
+    # Update bearer tokens from workshop details files
+    if [[ "$action" == "deploy" ]]; then
+        update_bearer_tokens "$env_dir" "$verbose"
     fi
     
     # Determine users to process
@@ -486,26 +625,35 @@ main() {
     # Execute action
     case "$action" in
         deploy)
-            # Deploy namespace first (only once)
-            if ! deploy_namespace "$namespace" "$verbose"; then
-                exit 1
-            fi
+            # Multi-cluster deployment - each user gets their own cluster
+            log_warn "Multi-cluster deployment: Connecting to each user's individual OpenShift cluster"
             
-            # Deploy user instances
             if [[ ${#users[@]} -eq 1 ]]; then
                 deploy_user_vscode "${users[0]}" "$env_dir" "$namespace" "$verbose" "$dry_run"
             else
-                deploy_users_parallel "${users[@]}" "$env_dir" "$namespace" "$verbose" "$dry_run" "$parallel"
+                deploy_users_sequential "${users[@]}" "$env_dir" "$namespace" "$verbose" "$dry_run"
             fi
             ;;
         undeploy)
+            log_warn "Multi-cluster undeploy: Will connect to each user's individual cluster"
             for user in "${users[@]}"; do
-                undeploy_user_vscode "$user" "$namespace" "$verbose" "$dry_run"
+                # Login to user's specific cluster first
+                if login_to_user_cluster "$user" "$env_dir"; then
+                    undeploy_user_vscode "$user" "$namespace" "$verbose" "$dry_run"
+                else
+                    log_error "Failed to login to User $(printf "%02d" "$user") cluster - skipping undeploy"
+                fi
             done
             ;;
         status)
+            log_warn "Multi-cluster status: Will connect to each user's individual cluster"
             for user in "${users[@]}"; do
-                check_user_status "$user" "$namespace"
+                # Login to user's specific cluster first
+                if login_to_user_cluster "$user" "$env_dir"; then
+                    check_user_status "$user" "$namespace"
+                else
+                    echo "User $(printf "%02d" "$user"): LOGIN FAILED"
+                fi
             done
             ;;
     esac
