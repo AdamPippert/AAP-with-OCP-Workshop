@@ -21,7 +21,7 @@ This repository contains a comprehensive workshop delivery system for the Advanc
 - 🤖 **Automated AAP Controller setup** with job templates and credentials
 - ☸️ **OpenShift integration** with RBAC and resource management
 - 📧 **Automated email notifications** with personalized access details
-- 📊 **Multi-user management** supporting 50+ participants
+- 📊 **Multi-user management** supporting large workshops
 - 🚀 **One-command deployment** for complete workshop setup
 
 ## ⚡ Quick Start (Experienced Users)
@@ -66,10 +66,10 @@ cd AAP-with-OCP-Workshop
 ##### Request Demo Environments
 1. **Access RHDP**: Log into [Red Hat Demo Platform](https://demo.redhat.com)
 2. **Request AAP Demo**: Search for "Ansible Automation Platform Product Demo"
-3. **Calculate Environments**: RHDP limits to 30 users per environment
-   - **1-30 users**: Request 1 environment
-   - **31-60 users**: Request 2 environments  
-   - **61-90 users**: Request 3 environments
+3. **Calculate Environments**: RHDP has limits on users per environment
+   - **Small workshops**: Request 1 environment
+   - **Medium workshops**: Request 2 environments  
+   - **Large workshops**: Request 3 or more environments
    - Continue pattern for larger workshops
 
 ##### Export User Data from RHDP
@@ -117,22 +117,22 @@ user2@company.com
 ##### Save Workshop Details Files
 
 **File Naming Convention:**
-- **Environment 1**: Save as `workshop_details.txt` (users 1-30)
-- **Environment 2**: Save as `workshop_details2.txt` (users 31-60)
-- **Environment 3**: Save as `workshop_details3.txt` (users 61-90)
+- **Environment 1**: Save as `workshop_details.txt` (first batch of users)
+- **Environment 2**: Save as `workshop_details2.txt` (second batch of users)
+- **Environment 3**: Save as `workshop_details3.txt` (third batch of users)
 - Continue pattern: `workshop_detailsN.txt`
 
 **File Validation:**
 ```bash
 # Quick validation - each file should contain these patterns:
 grep -c "enterprise.aap-product-demos" workshop_details.txt
-# Expected: 30 (for environment with 30 users)
+# Expected: Number matching your environment size
 
 grep -c "@" workshop_details.txt  
-# Expected: 30 (email addresses)
+# Expected: Same number (email addresses)
 
 grep -c "OpenShift Console:" workshop_details.txt
-# Expected: 30 (OpenShift URLs)
+# Expected: Same number (OpenShift URLs)
 
 # Check file structure
 head -20 workshop_details.txt
@@ -163,7 +163,7 @@ The system automatically discovers and processes all `workshop_detailsX.txt` fil
 
 **Parsing Process:**
 - **Auto-discovery**: Finds all `workshop_details*.txt` files
-- **Continuous numbering**: Users numbered 1-47 across all files
+- **Continuous numbering**: Users numbered sequentially across all files
 - **Environment extraction**: Parses AWS, OpenShift, AAP, and SSH credentials
 - **Validation**: Checks for required fields and formats
 
@@ -550,7 +550,7 @@ curl -k "$AAP_URL/api/v2/ping/"
 
 ## 📋 Complete Workshop Setup Example
 
-Here's a real example for a 45-user workshop:
+Here's a real example for a multi-environment workshop:
 
 ### Step-by-Step Walkthrough
 
@@ -559,9 +559,9 @@ Here's a real example for a 45-user workshop:
 git clone https://github.com/your-org/AAP-with-OCP-Workshop.git
 cd AAP-with-OCP-Workshop
 
-# 2. Add RHDP export files (45 users = 2 environments)
-# - workshop_details.txt (users 1-30 from environment 1)
-# - workshop_details2.txt (users 31-45 from environment 2)
+# 2. Add RHDP export files (multiple environments as needed)
+# - workshop_details.txt (first batch of users from environment 1)
+# - workshop_details2.txt (second batch of users from environment 2)
 # Files should be in repository root
 
 # 3. Verify files are discovered
@@ -570,7 +570,7 @@ cd AAP-with-OCP-Workshop
 
 # 4. Parse all workshop details
 ./scripts/parse_workshop_details.sh -v
-# Creates user_environments/.env01 through .env45
+# Creates user_environments/.env files for all users
 
 # 5. Review parsed users
 cat user_environments/users.csv
@@ -596,10 +596,10 @@ cat workshop_emails/DELIVERY_INSTRUCTIONS.md
 ### Expected File Structure After Setup
 ```
 AAP-with-OCP-Workshop/
-├── workshop_details.txt          # RHDP export 1 (users 1-30)
-├── workshop_details2.txt         # RHDP export 2 (users 31-45)
+├── workshop_details.txt          # RHDP export 1 (first batch)
+├── workshop_details2.txt         # RHDP export 2 (second batch)
 ├── user_environments/            # Generated user configs
-│   ├── .env01, .env02, ..., .env45
+│   ├── .env01, .env02, ... (all users)
 │   ├── users.csv                 # User assignments
 │   ├── summary.txt               # Parse summary
 │   └── logs/                     # Setup logs
@@ -610,7 +610,7 @@ AAP-with-OCP-Workshop/
 ```
 
 ### Workshop Success Checklist
-- [ ] All 45 `.env` files created in `user_environments/`
+- [ ] All `.env` files created in `user_environments/` for each user
 - [ ] VSCode instances deployed: `./scripts/manage_vscode.sh status`
 - [ ] Email files generated: `ls workshop_emails/html/`
 - [ ] All environments validated: `./scripts/validate_multi_user.sh --full`
