@@ -54,11 +54,11 @@ This creates:
 
 ### Step 1: Workshop Details Format
 
-The system supports multiple workshop details files for large workshops that exceed the 30-user limit per RHDP environment. Files should be named:
+The system supports multiple workshop details files for large workshops that exceed the user limit per RHDP environment. Files should be named:
 
 - `workshop_details.txt` (primary file)
-- `workshop_details2.txt` (additional users 31-60)
-- `workshop_details3.txt` (additional users 61-90, if needed)
+- `workshop_details2.txt` (additional users)
+- `workshop_details3.txt` (more additional users, if needed)
 - etc.
 
 Each file should contain bulk export data in this format:
@@ -321,7 +321,7 @@ cat workshop_emails/DELIVERY_INSTRUCTIONS.md
 ### Partial Workshop Setup
 
 ```bash
-# Setup only first 10 users
+# Setup only specific user range
 ./scripts/setup_multi_user.sh -u 1-10
 
 # Setup specific problematic users
@@ -557,12 +557,12 @@ ansible-playbook playbooks/exercise1.yml -v
 - **Memory Limit**: 2Gi
 - **Storage**: 2Gi persistent volume
 
-**Namespace Quotas** (50 users):
-- **Total CPU Request**: 20 cores
-- **Total CPU Limit**: 40 cores
-- **Total Memory Request**: 40Gi
-- **Total Memory Limit**: 80Gi
-- **Total Storage**: 100Gi
+**Namespace Quotas** (example for large workshop):
+- **Total CPU Request**: Scales with user count
+- **Total CPU Limit**: Scales with user count
+- **Total Memory Request**: Scales with user count
+- **Total Memory Limit**: Scales with user count
+- **Total Storage**: Scales with user count
 
 ### Troubleshooting VSCode
 

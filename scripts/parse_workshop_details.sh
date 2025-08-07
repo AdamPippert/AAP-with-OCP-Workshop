@@ -54,7 +54,7 @@ OPTIONS:
 DESCRIPTION:
     This script parses workshop details files and creates individual .env files
     for each user environment. It supports multiple files for large workshops
-    that exceed the 30-user limit per RHDP environment.
+    that exceed the user limit per RHDP environment.
     
     Each user gets:
     - Individual .envXX file (where XX is user number)
